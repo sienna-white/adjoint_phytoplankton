@@ -3,14 +3,14 @@
 using Printf
 using DataStructures: OrderedDict
 using NCDatasets
-using Arrow, DataFrames
+using DataFrames
 using CSV, DataFrames
 using Colors
 using ColorSchemes
 using Plots
 using Printf
 using LaTeXStrings
-using Profile
+# using Profile
 using Statistics 
 
 include("../run_hydro/calculate_physical_variables.jl") 
@@ -20,7 +20,7 @@ include("../run_hydro/forcings.jl")
 include("../run_hydro/output.jl")
 
 
-file_out_name = "adjoint.nc" 
+file_out_name = "adjoint_2.nc" 
 
 
 using Random
@@ -165,7 +165,9 @@ function run_my_model(file_out_name::String)
     end
 
     grad = ds_algae["gamma"][:,:] .* output["lambda"]
-    new_gamma = gamma - grad*eps 
+    eps = 1
+
+    new_gamma = @. ds_algae["gamma"][:,:] + grad*eps 
 
     v = defVar(ds, "gamma", Float64,("z","time"), attrib = OrderedDict(
         "units" =>  "-", "long_name" => "gradient descent parameterized growth"))

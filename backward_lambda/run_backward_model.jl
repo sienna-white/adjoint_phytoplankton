@@ -91,24 +91,44 @@ function run_my_model(file_out_name::String)
         kz    = ds_hydro["Kz"][:,i]
         aL, bL, cL, dL = initialize_abcd(N)
          
-        if ws>0
+         if ws>0
             for i in 2:(N-1)
-                aL[i] = ws*dt/dz - (dt/dz^2)*(1/2)*(kz[i-1] + kz[i])
-                bL[i] = 1 - ws*dt/dz - gamma[i]*dt + (dt/dz^2)*(1/2)*(kz[i+1] + 2*kz[i] + kz[i-1])
+                aL[i] =  -ws*dt/dz - (dt/dz^2)*(1/2)*(kz[i-1] + kz[i])
+                bL[i] = 1 + ws*dt/dz - gamma[i]*dt + (dt/dz^2)*(1/2)*(kz[i+1] + 2*kz[i] + kz[i-1])
                 cL[i] = - (dt/dz^2)*(1/2) * (kz[i] + kz[i+1])
                 dL[i] = L_n[i] 
             end
         end 
 
         # Bottom-Boundary: no flux for scalars
-        bL[1] =  1 - (gamma[1]*dt) + (dt/dz^2)*(1/2)*(kz[1] + kz[2]) 
-        cL[1] =  -(dt/dz^2) * (1/2) * (kz[1] + kz[2])
+        bL[1] =  1 + ws*dt/dz - (gamma[1]*dt) + (dt/dz^2)*(1/2)*(kz[1] + kz[2]) 
+        cL[1] =  -ws*dt/dz - (dt/dz^2) * (1/2) * (kz[1] + kz[2])
         dL[1] =  L_n[1]
 
         # Top-Boundary: no flux for scalars
-        aL[end] = ws*dt/dz - (dt/dz^2)*(1/2)* (kz[end] + kz[end-1])
-        bL[end] = 1 - gamma[end]*dt + (dt/dz^2)*(1/2)*(kz[end] + kz[end-1])  
+        aL[end] = - (dt/dz^2)*(1/2)* (kz[end] + kz[end-1])
+        bL[end] = ws*dt/dz + 1 - gamma[end]*dt + (dt/dz^2)*(1/2)*(kz[end] + kz[end-1])  
         dL[end] = L_n[end]
+
+
+        # if ws>0
+        #     for i in 2:(N-1)
+        #         aL[i] = ws*dt/dz - (dt/dz^2)*(1/2)*(kz[i-1] + kz[i])
+        #         bL[i] = 1 - ws*dt/dz - gamma[i]*dt + (dt/dz^2)*(1/2)*(kz[i+1] + 2*kz[i] + kz[i-1])
+        #         cL[i] = - (dt/dz^2)*(1/2) * (kz[i] + kz[i+1])
+        #         dL[i] = L_n[i] 
+        #     end
+        # end 
+
+        # # Bottom-Boundary: no flux for scalars
+        # bL[1] =  1 - (gamma[1]*dt) + (dt/dz^2)*(1/2)*(kz[1] + kz[2]) 
+        # cL[1] =  -(dt/dz^2) * (1/2) * (kz[1] + kz[2])
+        # dL[1] =  L_n[1]
+
+        # # Top-Boundary: no flux for scalars
+        # aL[end] = ws*dt/dz - (dt/dz^2)*(1/2)* (kz[end] + kz[end-1])
+        # bL[end] = 1 - gamma[end]*dt + (dt/dz^2)*(1/2)*(kz[end] + kz[end-1])  
+        # dL[end] = L_n[end]
 
         L_nminus1 = TDMA(aL, bL, cL, dL, N) 
 
@@ -143,6 +163,13 @@ function run_my_model(file_out_name::String)
         "units" =>  units_dict[var], "long_name" => var2name[var]))
         v[:,:] = output[var];
     end
+
+    grad = ds_algae["gamma"][:,:] .* output["lambda"]
+    new_gamma = gamma - grad*eps 
+
+    v = defVar(ds, "gamma", Float64,("z","time"), attrib = OrderedDict(
+        "units" =>  "-", "long_name" => "gradient descent parameterized growth"))
+    v[:,:] = new_gamma;
 
     print("Saved $file_out_name \n")
     close(ds)

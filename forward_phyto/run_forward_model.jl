@@ -4,7 +4,7 @@ using Plots
 using Printf
 using DataStructures: OrderedDict
 using NCDatasets
-using Arrow, DataFrames
+# using Arrow, DataFrames
 using CSV, DataFrames
 using Colors
 using ColorSchemes
@@ -23,20 +23,25 @@ include("output.jl")
 
 
 
+# file_out_name = "phyto_GUESS_2.nc" 
 
-file_out_name = "phyto_GUESS.nc" 
+function run_forward_model(file_out_name::String, adjoint_ds::String)
 
-function run_my_model(file_out_name::String)
+    println("\n\nRunning the FORWARD PHYTOPLANKTON MODEL --> we are going forward in time")
+    println("Adjusting our growth guess using the gamma from: $(adjoint_ds)")
+    println("Will be saving phytoplankton output to: $(file_out_name)")
+    
 
-    ds = NCDataset("../run_hydro/HYDRO.nc")
+    ds = NCDataset("/Users/siennawhite/research/scripts/adjoint_phytoplankton/run_hydro/HYDRO.nc")
 
+    gamma_ds = NCDataset("backward_lambda/$(adjoint_ds)")  #"../backward_lambda/adjoint_2.nc")
 
     #***********************************************************************
     # Read in the CIMIS data
-    cimis_fn = "/global/homes/s/siennaw/scratch/siennaw/turbulence-model/data/CIMIS/PAR_on_august_9-15.csv"
-    df = CSV.read(cimis_fn, DataFrame)
-    par = df[!,"Sol Rad (PAR)"]
-    println("Read in CIMIS data ...")
+    # cimis_fn = "/global/homes/s/siennaw/scratch/siennaw/turbulence-model/data/CIMIS/PAR_on_august_9-15.csv"
+    # df = CSV.read(cimis_fn, DataFrame)
+    # par = df[!,"Sol Rad (PAR)"]
+    # println("Read in CIMIS data ...")
 
 
     function get_light(index::Int, par=par)
@@ -99,9 +104,7 @@ function run_my_model(file_out_name::String)
     algae1["c"] = zeros(N) .+ init_algae 
     # algae2["c"] = zeros(N) .+ 1e-3 #@init_algae 
 
-    Times = collect(0:dt:(M*dt))
-
-    # println("Times = ", Times)
+    Times = collect(1:dt:(M*dt))
 
     real_times_saved = []
 
@@ -115,17 +118,18 @@ function run_my_model(file_out_name::String)
 
         time = Times[i];
 
-        I0 = get_light(i)
+        # I0 = get_light(i)
 
         # [8] Advance phytoplankton
         # light = self_shading(algae1, algae2, I0, background_turbidity, discretization)
-        light = light_decay(I0, background_turbidity, discretization)
+        # light = light_decay(I0, background_turbidity, discretization)
 
         # Hydrodynamics
         variables["Kz"] = ds["Kz"][:,i]
 
         # Algae 1
-        gamma = calculate_net_growth(algae1, light, discretization)
+        # gamma = calculate_net_growth(algae1, light, discretization)
+        gamma = gamma_ds["gamma"][:,i]
         algae1["c"] = advance_algae(variables, algae1, gamma, discretization)  # zeros(N) .+ init_algae  #
         # println("Algae 1: ", algae1["c"])
         # Algae 2
@@ -165,12 +169,20 @@ function run_my_model(file_out_name::String)
                 "algae1" => "Diatom concentration",
                 "algae2" => "HAB concentration",
                 "L" => "Turbulent length scale", 
-                "Q2" => "TKE","Q2L" => "TKE*L",
-                "N_BV2" => "Brunt-Vaisala frequency", "Kq" => "Kq", "Nu" => "Nu_t", "gamma" => "Net growth rate [1/s]")
+                "Q2" => "TKE",
+                "Q2L" => "TKE*L",
+                "N_BV2" => "Brunt-Vaisala frequency", 
+                "Kq" => "Kq", 
+                "Nu" => "Nu_t", 
+                "gamma" => "Net growth rate [1/s]")
 
-    times_unique = unique(times) 
+    times_unique = unique(Times) 
+    println("start + end of times unique $(times_unique[1]) $(times_unique[end])")
+    println("Times unique has $(length(times_unique)) elements \n")
 
-    ds = NCDataset(file_out_name,"c")
+
+    fout = "forward_phyto/$(file_out_name)"
+    ds = NCDataset(fout,"c")
     defDim(ds, "z", length(z)) 
     defDim(ds, "time", length(times_unique))
 
@@ -187,13 +199,15 @@ function run_my_model(file_out_name::String)
         v[:,:] = output[var];
     end
 
+    println("Size of saved gamma: $(size(ds["gamma"][:,:]))")
+
     print("Saved $file_out_name \n")
     close(ds)
     
 end 
 
 
-run_my_model(file_out_name)
+# run_my_model(file_out_name)
 
 # @profilehtml run_my_model(ws1, ws2, pmax1, pmax2, file_out_name)
 

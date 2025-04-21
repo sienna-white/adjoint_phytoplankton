@@ -17,10 +17,10 @@ include("../run_hydro/calculate_physical_variables.jl")
 include("../run_hydro/advance_variables.jl")
 include("../run_hydro/phytoplankton.jl")
 include("../run_hydro/forcings.jl") 
-include("../run_hydro/output.jl")
+include("../forward_phyto/output.jl")
 
 
-file_out_name = "adjoint_2.nc" 
+# file_out_name = "adjoint_2.nc" 
 
 
 using Random
@@ -28,12 +28,19 @@ Random.seed!(1234);      # Seed number 1234
 
 
 
-function run_my_model(file_out_name::String)
+function run_backward_model(file_out_name::String, algae_guess_ds:: String)
 
-    ds_hydro = NCDataset("../run_hydro/HYDRO.nc")
-    ds_algae = NCDataset("../forward_phyto/phyto_GUESS.nc")
-    ds_truth = NCDataset("../forward_phyto/phyto_TRUTH.nc")
+    println("\n\nRunning the ADJOINT OPERATOR MODEL --> we are going backward in time")
+    println("Using the algae guess dataset: $(algae_guess_ds)")
+    println("Will be saving adjoint variable output to: $(file_out_name)")
+
+
+    ds_hydro = NCDataset("run_hydro/HYDRO.nc")
+    ds_algae = NCDataset("forward_phyto/$(algae_guess_ds)")  #"../forward_phyto/phyto_GUESS.nc")
+    ds_truth = NCDataset("forward_phyto/phyto_TRUTH.nc")
     
+    println("Size of ds_algae gamma: $(size(ds_algae["gamma"][:,:]))")
+
 
     # println(ds_hydro) 
     # println(ds_algae)
@@ -75,14 +82,15 @@ function run_my_model(file_out_name::String)
 
     # print(c_diff)
 
-    save2output(time, M-1, "lambda", L_n) 
 
-    Times = collect(0:dt:(M*dt))
-    Times = Times[1:end-1]
+    Times = collect(1:dt:(M*dt))
+    # Times = Times[1:end]
+
+    save2output(Times[end], (M), "lambda", L_n) 
 
 
-    for i in (M-2):-1:1
-        println("Time = $i") 
+    for i in (M-1):-1:1
+        # println("Time = $i") 
 
         time = Times[i];
 
@@ -94,20 +102,20 @@ function run_my_model(file_out_name::String)
          if ws>0
             for i in 2:(N-1)
                 aL[i] =  -ws*dt/dz - (dt/dz^2)*(1/2)*(kz[i-1] + kz[i])
-                bL[i] = 1 + ws*dt/dz - gamma[i]*dt + (dt/dz^2)*(1/2)*(kz[i+1] + 2*kz[i] + kz[i-1])
+                bL[i] = 1 + ws*dt/dz + gamma[i]*dt + (dt/dz^2)*(1/2)*(kz[i+1] + 2*kz[i] + kz[i-1])
                 cL[i] = - (dt/dz^2)*(1/2) * (kz[i] + kz[i+1])
                 dL[i] = L_n[i] 
             end
         end 
 
         # Bottom-Boundary: no flux for scalars
-        bL[1] =  1 + ws*dt/dz - (gamma[1]*dt) + (dt/dz^2)*(1/2)*(kz[1] + kz[2]) 
+        bL[1] =  1 + ws*dt/dz + (gamma[1]*dt) + (dt/dz^2)*(1/2)*(kz[1] + kz[2]) 
         cL[1] =  -ws*dt/dz - (dt/dz^2) * (1/2) * (kz[1] + kz[2])
         dL[1] =  L_n[1]
 
         # Top-Boundary: no flux for scalars
         aL[end] = - (dt/dz^2)*(1/2)* (kz[end] + kz[end-1])
-        bL[end] = ws*dt/dz + 1 - gamma[end]*dt + (dt/dz^2)*(1/2)*(kz[end] + kz[end-1])  
+        bL[end] = ws*dt/dz + 1 + gamma[end]*dt + (dt/dz^2)*(1/2)*(kz[end] + kz[end-1])  
         dL[end] = L_n[end]
 
 
@@ -139,16 +147,16 @@ function run_my_model(file_out_name::String)
 
 #     # ********************** save data ****************************
     units_dict = Dict("lambda" => "[-]")
-
     var2name = Dict("lambda" => "Lagrangian multiplier")
 
-    times_unique = unique(times[1:end]) 
-    
+    times_unique = unique(times) 
+    println("length(times) = $(length(Times))")
+    println("start + end of times unique $(times_unique[1]) $(times_unique[end-3:end])")
+    println("Times unique has $(length(times_unique)) elements \n")
 
-    print("Times unique has $(length(times_unique)) elements \n")
 
-
-    ds = NCDataset(file_out_name,"c")
+    fout = "backward_lambda/$(file_out_name)"
+    ds = NCDataset(fout,"c")
     defDim(ds, "z", length(z)) 
     defDim(ds, "time", length(times_unique))
 
@@ -163,6 +171,10 @@ function run_my_model(file_out_name::String)
         "units" =>  units_dict[var], "long_name" => var2name[var]))
         v[:,:] = output[var];
     end
+
+
+    println("Size of ds_algae gamma: $(size(ds_algae["gamma"][:,:]))")
+    println("Size of output lambda: $(size(output["lambda"]))")
 
     grad = ds_algae["gamma"][:,:] .* output["lambda"]
     eps = 1
@@ -180,4 +192,4 @@ function run_my_model(file_out_name::String)
 
 end 
 
-run_my_model(file_out_name)
+# run_my_model(file_out_name)

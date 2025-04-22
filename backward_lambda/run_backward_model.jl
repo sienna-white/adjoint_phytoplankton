@@ -13,11 +13,11 @@ using LaTeXStrings
 # using Profile
 using Statistics 
 
-include("../run_hydro/calculate_physical_variables.jl") 
-include("../run_hydro/advance_variables.jl")
-include("../run_hydro/phytoplankton.jl")
-include("../run_hydro/forcings.jl") 
-include("../forward_phyto/output.jl")
+include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/calculate_physical_variables.jl") 
+include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/advance_variables.jl")
+include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/phytoplankton.jl")
+include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/forcings.jl") 
+include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/output.jl")
 
 
 # file_out_name = "adjoint_2.nc" 
@@ -86,7 +86,7 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
     Times = collect(1:dt:(M*dt))
     # Times = Times[1:end]
 
-    save2output(Times[end], (M), "lambda", L_n) 
+    save2output(Times[end], M, "lambda", L_n) 
 
 
     for i in (M-1):-1:1
@@ -150,9 +150,9 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
     var2name = Dict("lambda" => "Lagrangian multiplier")
 
     times_unique = unique(times) 
-    println("length(times) = $(length(Times))")
-    println("start + end of times unique $(times_unique[1]) $(times_unique[end-3:end])")
-    println("Times unique has $(length(times_unique)) elements \n")
+    # println("length(times) = $(length(Times))")
+    # println("start + end of times unique $(times_unique[1]) $(times_unique[end-3:end])")
+    # println("Times unique has $(length(times_unique)) elements \n")
 
 
     fout = "backward_lambda/$(file_out_name)"
@@ -173,11 +173,11 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
     end
 
 
-    println("Size of ds_algae gamma: $(size(ds_algae["gamma"][:,:]))")
-    println("Size of output lambda: $(size(output["lambda"]))")
+    # println("Size of ds_algae gamma: $(size(ds_algae["gamma"][:,:]))")
+    # println("Size of output lambda: $(size(output["lambda"]))")
 
     grad = ds_algae["gamma"][:,:] .* output["lambda"]
-    eps = 1
+    eps = 2
 
     new_gamma = @. ds_algae["gamma"][:,:] + grad*eps 
 

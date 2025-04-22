@@ -1,24 +1,24 @@
 #!/usr/bin/env julia
 
-using Plots
+# using Plots
 using Printf
 using DataStructures: OrderedDict
 using NCDatasets
 using Arrow, DataFrames
 using CSV, DataFrames
 using Colors
-using ColorSchemes
 using Plots
 using Printf
 using LaTeXStrings
-using Profile
+# using Profile
 using Statistics 
+using ColorSchemes
 
-include("calculate_physical_variables.jl") 
-include("advance_variables.jl")
-include("phytoplankton.jl")
-include("forcings.jl") 
-include("output.jl")
+include("../model_code/calculate_physical_variables.jl") 
+include("../model_code/advance_variables.jl")
+include("../model_code/phytoplankton.jl")
+include("../model_code/forcings.jl") 
+include("../model_code/output.jl")
 
 file_out_name = @sprintf("HYDRO.nc") 
 
@@ -27,7 +27,7 @@ function run_my_model(file_out_name::String)
 
     #***********************************************************************
     # Read in the feather file 
-    data  = Arrow.Table("interpolated_temperature_profile_aug10-16.feather")
+    data  = Arrow.Table("../model_code/interpolated_temperature_profile_aug10-16.feather")
     temp_data = DataFrame(data)
 
     function get_temp_field(index::Int, temp_data=temp_data)
@@ -138,7 +138,8 @@ function run_my_model(file_out_name::String)
                     "Nu" => nu_t, "Q2" => Q2, "Q2L" => Q2L, 
                     "Kq" => Kq, "Kz" => Kz, "L" => L)
 
-    Times = collect(0:dt:(M*dt))
+                    
+    Times = collect(1:dt:(M*dt))
     # println("Times = ", Times)
     real_times_saved = []
 
@@ -151,9 +152,9 @@ function run_my_model(file_out_name::String)
     save2output(1, 1, "L", variables["L"])
     save2output(1, 1, "Q2", variables["Q2"])
     save2output(1, 1, "N_BV2", variables["N_BV2"])
-    push!(real_times_saved, real_time[1])
+    # push!(real_times_saved, real_time[1])
 
-    for i in 2:(M-1)
+    for i in 2:M
 
         time = Times[i];
 
@@ -201,17 +202,13 @@ function run_my_model(file_out_name::String)
         variables["Kz"] = Kz
         variables["L"] = L
 
-      
-        # println("Index = $(div(i, isave))")
-        index = i   #(i-1) #div(i, isave)
-        # "U", "C", "Kz", "L", "Q2","N_BV2"
-        save2output(time, index, "U", variables["U"])
-        save2output(time, index, "Kz", variables["Kz"])
-        save2output(time, index, "C", variables["C"])
-        save2output(time, index, "L", variables["L"])
-        save2output(time, index, "Q2", variables["Q2"])
-        save2output(time, index, "N_BV2", variables["N_BV2"])
-        push!(real_times_saved, real_time[i])
+        save2output(time, i, "U", variables["U"])
+        save2output(time, i, "Kz", variables["Kz"])
+        save2output(time, i, "C", variables["C"])
+        save2output(time, i, "L", variables["L"])
+        save2output(time, i, "Q2", variables["Q2"])
+        save2output(time, i, "N_BV2", variables["N_BV2"])
+        # push!(real_times_saved, real_time[i])
 
     end
    
@@ -238,11 +235,12 @@ function run_my_model(file_out_name::String)
                 "N_BV2" => "Brunt-Vaisala frequency", "Kq" => "Kq", "Nu" => "Nu_t")
 
     times_unique = unique(times) 
-    # println(real_times_saved)
+
     
     # Print shape of 
     # println("Length of times_unique = ", length(times_unique))
-    println("Length of real_times_saved = ", length(real_times_saved))
+    println("start + end of times unique $(times_unique[1]) $(times_unique[end])")
+    println("Times unique has $(length(times_unique)) elements \n")
 
     ds = NCDataset(file_out_name,"c")
 

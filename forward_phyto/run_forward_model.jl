@@ -14,12 +14,11 @@ using LaTeXStrings
 using Profile
 using Statistics 
 
-include("calculate_physical_variables.jl") 
-include("advance_variables.jl")
-include("phytoplankton.jl")
-include("forcings.jl") 
-include("output.jl")
-
+include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/calculate_physical_variables.jl") 
+include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/advance_variables.jl")
+include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/phytoplankton.jl")
+include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/forcings.jl") 
+include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/output.jl")
 
 
 
@@ -32,21 +31,30 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
     println("Will be saving phytoplankton output to: $(file_out_name)")
     
 
-    ds = NCDataset("/Users/siennawhite/research/scripts/adjoint_phytoplankton/run_hydro/HYDRO.nc")
+    ds = NCDataset("/pscratch/sd/s/siennaw/adjoint_phytoplankton/run_hydro/HYDRO.nc")
 
-    gamma_ds = NCDataset("backward_lambda/$(adjoint_ds)")  #"../backward_lambda/adjoint_2.nc")
-
+    if adjoint_ds == "FIRST"
+        calculate_gamma = true 
+        println("First run: calculating gamma")
+                
+        # Read in the CIMIS data
+        cimis_fn = "/global/homes/s/siennaw/scratch/siennaw/turbulence-model/data/CIMIS/PAR_on_august_9-15.csv"
+        df = CSV.read(cimis_fn, DataFrame)
+        par = df[!,"Sol Rad (PAR)"]
+        println("Read in CIMIS data ...")
+        function get_light(index::Int, par=par)
+            return par[index]
+        end
+    else   
+        calculate_gamma = false
+        println("Using growth rate from adjoint model")
+        gamma_ds = NCDataset("backward_lambda/$(adjoint_ds)")  #"../backward_lambda/adjoint_2.nc")
+    end 
     #***********************************************************************
-    # Read in the CIMIS data
-    # cimis_fn = "/global/homes/s/siennaw/scratch/siennaw/turbulence-model/data/CIMIS/PAR_on_august_9-15.csv"
-    # df = CSV.read(cimis_fn, DataFrame)
-    # par = df[!,"Sol Rad (PAR)"]
-    # println("Read in CIMIS data ...")
 
 
-    function get_light(index::Int, par=par)
-        return par[index]
-    end
+
+
 
     #********************** SPATIAL DOMAIN  ***************************
     N = 60    # number of grid points
@@ -114,37 +122,26 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
 
     variables = Dict("Kz" => ds["Kz"][:,1])
 
-    for i in 2:(M-1)
+    for i in 2:M
 
         time = Times[i];
-
-        # I0 = get_light(i)
-
-        # [8] Advance phytoplankton
-        # light = self_shading(algae1, algae2, I0, background_turbidity, discretization)
-        # light = light_decay(I0, background_turbidity, discretization)
-
         # Hydrodynamics
         variables["Kz"] = ds["Kz"][:,i]
 
-        # Algae 1
-        # gamma = calculate_net_growth(algae1, light, discretization)
-        gamma = gamma_ds["gamma"][:,i]
+        # Phytoplankton
+        if calculate_gamma 
+            I0 = get_light(i)
+            # light = self_shading(algae1, algae2, I0, background_turbidity, discretization)
+            light = light_decay(I0, background_turbidity, discretization)
+            gamma = calculate_net_growth(algae1, light, discretization)
+        else 
+            gamma = gamma_ds["gamma"][:,i]
+        end 
+
+        # Algae 
         algae1["c"] = advance_algae(variables, algae1, gamma, discretization)  # zeros(N) .+ init_algae  #
-        # println("Algae 1: ", algae1["c"])
-        # Algae 2
-        # gamma = calculate_net_growth(algae2, light, discretization) 
-        # algae2["c"] = advance_algae(variables, algae2, gamma, discretization)
-        # algae2["c"] = zeros(N) .+ init_algae 
-
-        # [9] Pack variables for next timestep 
-        
-
         save2output(time, i, "gamma", gamma)
         save2output(time, i, "algae1", algae1["c"])
-        # save2output(time, i, "algae2", algae2["c"])
-            # push!(real_times_saved, real_time[i])
-        
 
     end
 
@@ -177,11 +174,13 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
                 "gamma" => "Net growth rate [1/s]")
 
     times_unique = unique(Times) 
-    println("start + end of times unique $(times_unique[1]) $(times_unique[end])")
-    println("Times unique has $(length(times_unique)) elements \n")
+    # println("start + end of times unique $(times_unique[1]) $(times_unique[end])")
+    # println("Times unique has $(length(times_unique)) elements \n")
 
 
     fout = "forward_phyto/$(file_out_name)"
+    # fout = file_out_name
+    # fout = "forward_phyto/$(file_out_name)"
     ds = NCDataset(fout,"c")
     defDim(ds, "z", length(z)) 
     defDim(ds, "time", length(times_unique))
@@ -199,15 +198,14 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
         v[:,:] = output[var];
     end
 
-    println("Size of saved gamma: $(size(ds["gamma"][:,:]))")
+    # println("Size of saved gamma: $(size(ds["gamma"][:,:]))")
 
     print("Saved $file_out_name \n")
     close(ds)
     
 end 
 
-
-# run_my_model(file_out_name)
+# run_forward_model("phyto_TRUTH.nc", "FIRST")
 
 # @profilehtml run_my_model(ws1, ws2, pmax1, pmax2, file_out_name)
 

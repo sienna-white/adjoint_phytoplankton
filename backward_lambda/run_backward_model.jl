@@ -20,12 +20,8 @@ include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/forcings.jl")
 include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/output.jl")
 
 
-# file_out_name = "adjoint_2.nc" 
-
-
 using Random
 Random.seed!(1234);      # Seed number 1234
-
 
 
 function run_backward_model(file_out_name::String, algae_guess_ds:: String)
@@ -40,11 +36,6 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
     ds_truth = NCDataset("forward_phyto/phyto_TRUTH.nc")
     
     println("Size of ds_algae gamma: $(size(ds_algae["gamma"][:,:]))")
-
-
-    # println(ds_hydro) 
-    # println(ds_algae)
-
 
 
     #********************** SPATIAL DOMAIN  ***************************
@@ -69,8 +60,12 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
     lambda = zeros(N) 
 
     println("Initializing with ground truth + some noise")
-    ground_truth_w_noise =  ds_truth["algae1"][:,end] #+ rand(N).*1e-3
+    ground_truth_w_noise =  ds_truth["algae1"][:,end] + rand(N).*1e-6
     c_diff = 2*(ds_algae["algae1"][:,end] - ground_truth_w_noise)
+
+    # println("C_diff = $(c_diff)")
+    # c_diff = 2*(ground_truth_w_noise - ds_algae["algae1"][:,end])
+
     # c_diff = reverse(c_diff)
     # println(c_diff)
 
@@ -78,7 +73,8 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
 
     # assert(false)
 
-    L_n = c_diff
+    L_n = zeros(N) 
+    #c_diff
 
     # print(c_diff)
 
@@ -102,42 +98,27 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
          if ws>0
             for i in 2:(N-1)
                 aL[i] =  -ws*dt/dz - (dt/dz^2)*(1/2)*(kz[i-1] + kz[i])
-                bL[i] = 1 + ws*dt/dz + gamma[i]*dt + (dt/dz^2)*(1/2)*(kz[i+1] + 2*kz[i] + kz[i-1])
+                bL[i] = 1 + ws*dt/dz - gamma[i]*dt + (dt/dz^2)*(1/2)*(kz[i+1] + 2*kz[i] + kz[i-1])
                 cL[i] = - (dt/dz^2)*(1/2) * (kz[i] + kz[i+1])
                 dL[i] = L_n[i] 
             end
         end 
 
         # Bottom-Boundary: no flux for scalars
-        bL[1] =  1 + ws*dt/dz + (gamma[1]*dt) + (dt/dz^2)*(1/2)*(kz[1] + kz[2]) 
+        bL[1] =  1 + ws*dt/dz - (gamma[1]*dt) + (dt/dz^2)*(1/2)*(kz[1] + kz[2]) 
         cL[1] =  -ws*dt/dz - (dt/dz^2) * (1/2) * (kz[1] + kz[2])
         dL[1] =  L_n[1]
 
         # Top-Boundary: no flux for scalars
         aL[end] = - (dt/dz^2)*(1/2)* (kz[end] + kz[end-1])
-        bL[end] = ws*dt/dz + 1 + gamma[end]*dt + (dt/dz^2)*(1/2)*(kz[end] + kz[end-1])  
+        bL[end] = ws*dt/dz + 1 - gamma[end]*dt + (dt/dz^2)*(1/2)*(kz[end] + kz[end-1])  
         dL[end] = L_n[end]
 
-
-        # if ws>0
-        #     for i in 2:(N-1)
-        #         aL[i] = ws*dt/dz - (dt/dz^2)*(1/2)*(kz[i-1] + kz[i])
-        #         bL[i] = 1 - ws*dt/dz - gamma[i]*dt + (dt/dz^2)*(1/2)*(kz[i+1] + 2*kz[i] + kz[i-1])
-        #         cL[i] = - (dt/dz^2)*(1/2) * (kz[i] + kz[i+1])
-        #         dL[i] = L_n[i] 
-        #     end
-        # end 
-
-        # # Bottom-Boundary: no flux for scalars
-        # bL[1] =  1 - (gamma[1]*dt) + (dt/dz^2)*(1/2)*(kz[1] + kz[2]) 
-        # cL[1] =  -(dt/dz^2) * (1/2) * (kz[1] + kz[2])
-        # dL[1] =  L_n[1]
-
-        # # Top-Boundary: no flux for scalars
-        # aL[end] = ws*dt/dz - (dt/dz^2)*(1/2)* (kz[end] + kz[end-1])
-        # bL[end] = 1 - gamma[end]*dt + (dt/dz^2)*(1/2)*(kz[end] + kz[end-1])  
-        # dL[end] = L_n[end]
-
+        # initial condition 
+        if i == (M-1)
+            dL = dL .+ c_diff.*dt 
+        end 
+   
         L_nminus1 = TDMA(aL, bL, cL, dL, N) 
 
         save2output(time, i, "lambda", L_nminus1)
@@ -179,7 +160,7 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
     grad = ds_algae["gamma"][:,:] .* output["lambda"]
     eps = 2
 
-    new_gamma = @. ds_algae["gamma"][:,:] + grad*eps 
+    new_gamma = @. ds_algae["gamma"][:,:] - grad*eps 
 
     v = defVar(ds, "gamma", Float64,("z","time"), attrib = OrderedDict(
         "units" =>  "-", "long_name" => "gradient descent parameterized growth"))
@@ -193,3 +174,41 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
 end 
 
 # run_my_model(file_out_name)
+
+
+ # else
+    #     for i in 2:(N-1)
+    #         aA[i]  = -wsdtdz - beta/2 * (Kz_past[i-1]+ Kz_past[i]) 
+    #         bA[i]  = 1 + wsdtdz - gamma[i]*dt  + beta/2*(Kz_past[i+1] + 2*Kz_past[i] + Kz_past[i-1]) 
+    #         cA[i]  = -beta/2 * (Kz_past[i] + Kz_past[i+1])
+    #         dA[i]  = A_past[i]
+    #     end 
+           
+    #     # Bottom-Boundary: no flux for scalars
+    #     bA[1] =  1 + wsdtdz - (gamma[1]*dt) + beta/2*(Kz_past[2] + Kz_past[1]) 
+    #     cA[1] =  -wsdtdz -beta/2 * (Kz_past[2] + Kz_past[1])
+    #     dA[1] =  A_past[1]
+
+    #     # Top-Boundary: no flux for scalars
+    #     aA[end] =  -beta/2 * (Kz_past[end] + Kz_past[end-1])
+    #     bA[end] =  1 - gamma[end]*dt + beta/2 * (Kz_past[end] + Kz_past[end-1]) + wsdtdz # okay adding this here 
+    #     dA[end] = A_past[end]   
+
+        # if ws>0
+        #     for i in 2:(N-1)
+        #         aL[i] = ws*dt/dz - (dt/dz^2)*(1/2)*(kz[i-1] + kz[i])
+        #         bL[i] = 1 - ws*dt/dz - gamma[i]*dt + (dt/dz^2)*(1/2)*(kz[i+1] + 2*kz[i] + kz[i-1])
+        #         cL[i] = - (dt/dz^2)*(1/2) * (kz[i] + kz[i+1])
+        #         dL[i] = L_n[i] 
+        #     end
+        # end 
+
+        # # Bottom-Boundary: no flux for scalars
+        # bL[1] =  1 - (gamma[1]*dt) + (dt/dz^2)*(1/2)*(kz[1] + kz[2]) 
+        # cL[1] =  -(dt/dz^2) * (1/2) * (kz[1] + kz[2])
+        # dL[1] =  L_n[1]
+
+        # # Top-Boundary: no flux for scalars
+        # aL[end] = ws*dt/dz - (dt/dz^2)*(1/2)* (kz[end] + kz[end-1])
+        # bL[end] = 1 - gamma[end]*dt + (dt/dz^2)*(1/2)*(kz[end] + kz[end-1])  
+        # dL[end] = L_n[end]

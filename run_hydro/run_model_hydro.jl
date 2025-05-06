@@ -19,15 +19,26 @@ include("../model_code/advance_variables.jl")
 include("../model_code/phytoplankton.jl")
 include("../model_code/forcings.jl") 
 include("../model_code/output.jl")
+include("../model_code/define_params.jl")
 
-file_out_name = @sprintf("HYDRO.nc") 
+file_out_name = @sprintf("HYDRO") 
 
 function run_my_model(file_out_name::String)
 
 
+    #********************** SPATIAL DOMAIN  ***************************
+    N = global_params["N"]   # number of grid points
+    H = global_params["H"]   # depth (meters)
+    dz = global_params["dz"] # grid spacing - may need to adjust to reduce oscillations
+    dt = global_params["dt"] # (seconds) size of time step
+    M  = global_params["M"]  # number of time steps
+    time_range = global_params["time_range"] # number of time steps
+
+    file_out_name = @sprintf("HYDRO_%s.nc", time_range)
     #***********************************************************************
     # Read in the feather file 
-    data  = Arrow.Table("../model_code/interpolated_temperature_profile_aug10-16.feather")
+    
+    data  = Arrow.Table("/pscratch/sd/s/siennaw/stockton_field_data/forcing_for_model/interpolated_temperature_profile_$time_range.feather")
     temp_data = DataFrame(data)
 
     function get_temp_field(index::Int, temp_data=temp_data)
@@ -40,7 +51,7 @@ function run_my_model(file_out_name::String)
 
     #***********************************************************************
     # Read in the CIMIS data
-    cimis_fn = "/global/homes/s/siennaw/scratch/siennaw/turbulence-model/data/CIMIS/PAR_on_august_9-15.csv"
+    cimis_fn = "/pscratch/sd/s/siennaw/stockton_field_data/forcing_for_model/PAR_on_$time_range.csv"
     df = CSV.read(cimis_fn, DataFrame)
     par = df[!,"Sol Rad (PAR)"]
     println("Read in CIMIS data ...")
@@ -53,7 +64,7 @@ function run_my_model(file_out_name::String)
 
     #***********************************************************************
     # Wind time series 
-    wind_fn = "/global/homes/s/siennaw/scratch/siennaw/turbulence-model/data/forcing_data/wind_on_august_10-16.csv"
+    wind_fn = "/pscratch/sd/s/siennaw/stockton_field_data/forcing_for_model/wind_on_$time_range.csv"
     df = CSV.read(wind_fn, DataFrame)
     wind = df[!,"WindSpeed"]
     real_time = df[!,"time"]
@@ -66,15 +77,9 @@ function run_my_model(file_out_name::String)
     #***********************************************************************
 
 
-    #********************** SPATIAL DOMAIN  ***************************
-    N = 60    # number of grid points
-    H = 6    # depth (meters)
-    dz = H/N  # grid spacing - may need to adjust to reduce oscillations
-    dt = 10   # (seconds) size of time step 
-    M  = 10000 #00 #000 # 50000  #500 #
 
     # Increments for saving profiles. set to 1 to save all; 10 saves every 10th, etc. 
-    isave = 1 #1000
+    isave = 1 
     var2save = ["U", "C", "Kz", "L", "Q2","N_BV2"]
 
     create_output_dict(M, isave, var2save, N)

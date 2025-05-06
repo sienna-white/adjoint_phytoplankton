@@ -19,26 +19,36 @@ include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/advance_variabl
 include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/phytoplankton.jl")
 include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/forcings.jl") 
 include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/output.jl")
+include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/define_params.jl")
 
 
 
-# file_out_name = "phyto_GUESS_2.nc" 
+
 
 function run_forward_model(file_out_name::String, adjoint_ds::String)
 
+    #********************** SPATIAL DOMAIN  ***************************
+    N = global_params["N"]   # number of grid points
+    H = global_params["H"]   # depth (meters)
+    dz = global_params["dz"] # grid spacing - may need to adjust to reduce oscillations
+    dt = global_params["dt"] # (seconds) size of time step
+    M  = global_params["M"]  # number of time steps
+    time_range = global_params["time_range"] # number of time steps
+
+    file_out_name = "$(file_out_name)_$(time_range).nc"
     println("\n\nRunning the FORWARD PHYTOPLANKTON MODEL --> we are going forward in time")
     println("Adjusting our growth guess using the gamma from: $(adjoint_ds)")
     println("Will be saving phytoplankton output to: $(file_out_name)")
-    
 
-    ds = NCDataset("/pscratch/sd/s/siennaw/adjoint_phytoplankton/run_hydro/HYDRO.nc")
+
+    ds = NCDataset("/pscratch/sd/s/siennaw/adjoint_phytoplankton/run_hydro/HYDRO_$time_range.nc")
 
     if adjoint_ds == "FIRST"
         calculate_gamma = true 
         println("First run: calculating gamma")
                 
         # Read in the CIMIS data
-        cimis_fn = "/global/homes/s/siennaw/scratch/siennaw/turbulence-model/data/CIMIS/PAR_on_august_9-15.csv"
+        cimis_fn = "/pscratch/sd/s/siennaw/stockton_field_data/forcing_for_model/PAR_on_$time_range.csv"
         df = CSV.read(cimis_fn, DataFrame)
         par = df[!,"Sol Rad (PAR)"]
         println("Read in CIMIS data ...")
@@ -48,7 +58,7 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
     else   
         calculate_gamma = false
         println("Using growth rate from adjoint model")
-        gamma_ds = NCDataset("backward_lambda/$(adjoint_ds)")  #"../backward_lambda/adjoint_2.nc")
+        gamma_ds = NCDataset("backward_lambda/$(adjoint_ds)_$time_range.nc")  #"../backward_lambda/adjoint_2.nc")
     end 
     #***********************************************************************
 
@@ -56,12 +66,6 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
 
 
 
-    #********************** SPATIAL DOMAIN  ***************************
-    N = 60    # number of grid points
-    H = 6    # depth (meters)
-    dz = H/N  # grid spacing - may need to adjust to reduce oscillations
-    dt = 10   # (seconds) size of time step 
-    M  = 10000 #00 #000 # 50000  #500 #
 
     # Increments for saving profiles. set to 1 to save all; 10 saves every 10th, etc. 
     isave = 1 
@@ -91,10 +95,10 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
     init_algae = 0.01
 
     algae1 = Dict("k" => 0.034,              # specific light attenuation coefficient [cm^2 / 10^6 cells]
-                "pmax" => 0.06 * hr2s,           # maximum specific growth rate [1/hour]
+                "pmax" => 0.1 * hr2s,           # maximum specific growth rate [1/hour]
                 "ws" => 1.38e-4,           # vertical velocity [m/s]
                 "Hi" => 40,                # half-saturation of light-limited growth [mu mol photons * m^2/s]
-                "Li" => 0.004 * hr2s,             # specific loss rate [1/hour]
+                "Li" => 0.003 * hr2s,             # specific loss rate [1/hour]
                 "name" => "HAB",           # name of the species
                 "self_shading" => true)    # self-shading effect (true/false)
     # '''
@@ -178,7 +182,7 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
     # println("Times unique has $(length(times_unique)) elements \n")
 
 
-    fout = "forward_phyto/$(file_out_name)"
+    fout = "/pscratch/sd/s/siennaw/adjoint_phytoplankton/forward_phyto/$(file_out_name)"
     # fout = file_out_name
     # fout = "forward_phyto/$(file_out_name)"
     ds = NCDataset(fout,"c")
@@ -205,7 +209,11 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
     
 end 
 
-# run_forward_model("phyto_TRUTH.nc", "FIRST")
+
+
+# file_out_name = "phyto_GUESS_2"  
+
+# run_forward_model(file_out_name, "FIRST")
 
 # @profilehtml run_my_model(ws1, ws2, pmax1, pmax2, file_out_name)
 

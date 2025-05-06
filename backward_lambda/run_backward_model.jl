@@ -30,20 +30,82 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
     println("Using the algae guess dataset: $(algae_guess_ds)")
     println("Will be saving adjoint variable output to: $(file_out_name)")
 
-
-    ds_hydro = NCDataset("run_hydro/HYDRO.nc")
-    ds_algae = NCDataset("forward_phyto/$(algae_guess_ds)")  #"../forward_phyto/phyto_GUESS.nc")
-    ds_truth = NCDataset("forward_phyto/phyto_TRUTH.nc")
-    
-    println("Size of ds_algae gamma: $(size(ds_algae["gamma"][:,:]))")
-
-
     #********************** SPATIAL DOMAIN  ***************************
-    N = 60    # number of grid points
-    H = 6    # depth (meters)
-    dz = H/N  # grid spacing - may need to adjust to reduce oscillations
-    dt = 10   # (seconds) size of time step 
-    M  = 10000 #00 #000 # 50000  #500 #
+    N = global_params["N"]   # number of grid points
+    H = global_params["H"]   # depth (meters)
+    dz = global_params["dz"] # grid spacing - may need to adjust to reduce oscillations
+    dt = global_params["dt"] # (seconds) size of time step
+    M  = global_params["M"]  # number of time steps
+    time_range = global_params["time_range"] # number of time steps
+
+    file_out_name = "$(file_out_name)_$(time_range).nc"
+
+    ds_hydro = NCDataset("/pscratch/sd/s/siennaw/adjoint_phytoplankton/run_hydro/HYDRO_$time_range.nc")
+    ds_algae = NCDataset("/pscratch/sd/s/siennaw/adjoint_phytoplankton/forward_phyto/$(algae_guess_ds)_$(time_range).nc")  #"../forward_phyto/phyto_GUESS.nc")
+
+    # INITIALIZE THE ADJOINT FORCING --> DIFF BETWEEN MODEL & OBS 
+    # println("Initializing with ground truth + some noise")
+    ds_truth = NCDataset("forward_phyto/phyto_TRUTH.nc")
+    # ground_truth_w_noise =  ds_truth["algae1"][:,end] + rand(N).*1e-6
+    # c_diff = 2*(ds_algae["algae1"][:,end] - ground_truth_w_noise)
+
+    # # CREATE dictionary
+    adj_forcing = Dict() 
+    # adj_forcing[(M-1)] = c_diff
+
+    # # Let's say we have observations at times 
+    # for i in 1:500:M
+    #     # measurement is at depth N = 20
+    #     OBS_DEPTH = 20 
+    #     forcing = zeros(N)
+    #     forcing[OBS_DEPTH] =  2*(ds_algae["algae1"][OBS_DEPTH, i] - (ds_truth["algae1"][OBS_DEPTH, i] + rand()*1e-6))
+    #     adj_forcing[i] = forcing
+    # end
+
+    # CREATE dictionary
+    adj_forcing = Dict() 
+
+    # Read csv file 
+    df = CSV.read("/pscratch/sd/s/siennaw/stockton_field_data/profiler/profiles_cells_august_13.csv", DataFrame)
+    
+
+    # Get list of columns
+    time_steps = names(df)
+
+    for i in 1:length(time_steps)
+        
+        time_step = time_steps[i]
+        if time_step == "z"
+            continue
+        end
+        time_step_int = parse(Int, time_step) # Convert to integer
+        profile = df[!, time_step]   # Get profile data at that point 
+        profile = profile .* 1e-6 
+        difference = 2* (ds_algae["algae1"][:, time_step_int] - profile) 
+        adj_forcing[time_step_int] = difference 
+        # println("Found a profile at time step $(time_step)\n")
+    end 
+
+    # print(adj_forcing)
+    # println("Column names: ", col_names)
+    # assert(false)
+    # par = df[!,"Sol Rad (PAR)"]
+
+    # # Let's say we have observations at times 
+    # for i in 1:500:M
+    #     # measurement is at depth N = 20
+    #     OBS_DEPTH = 20 
+    #     forcing = zeros(N)
+    #     forcing[OBS_DEPTH] =  2*(ds_algae["algae1"][OBS_DEPTH, i] - (ds_truth["algae1"][OBS_DEPTH, i] + rand()*1e-6))
+    #     adj_forcing[i] = forcing
+    # end
+
+
+
+    # println("Size of ds_algae gamma: $(size(ds_algae["gamma"][:,:]))")
+
+
+
 
     # Increments for saving profiles. set to 1 to save all; 10 saves every 10th, etc. 
     isave = 1 #1000
@@ -59,9 +121,7 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
 
     lambda = zeros(N) 
 
-    println("Initializing with ground truth + some noise")
-    ground_truth_w_noise =  ds_truth["algae1"][:,end] + rand(N).*1e-6
-    c_diff = 2*(ds_algae["algae1"][:,end] - ground_truth_w_noise)
+
 
     # println("C_diff = $(c_diff)")
     # c_diff = 2*(ground_truth_w_noise - ds_algae["algae1"][:,end])
@@ -74,14 +134,9 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
     # assert(false)
 
     L_n = zeros(N) 
-    #c_diff
-
-    # print(c_diff)
 
 
     Times = collect(1:dt:(M*dt))
-    # Times = Times[1:end]
-
     save2output(Times[end], M, "lambda", L_n) 
 
 
@@ -115,9 +170,15 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
         dL[end] = L_n[end]
 
         # initial condition 
-        if i == (M-1)
-            dL = dL .+ c_diff.*dt 
+        if haskey(adj_forcing, i)
+            println("adj has forcing @ time $(i)")
+            dL = dL .+ adj_forcing[i].*dt 
         end 
+
+        # c_diff
+        # if i == (M-1)
+        #     dL = dL .+ c_diff.*dt 
+        # end 
    
         L_nminus1 = TDMA(aL, bL, cL, dL, N) 
 
@@ -162,6 +223,7 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
 
     new_gamma = @. ds_algae["gamma"][:,:] - grad*eps 
 
+
     v = defVar(ds, "gamma", Float64,("z","time"), attrib = OrderedDict(
         "units" =>  "-", "long_name" => "gradient descent parameterized growth"))
     v[:,:] = new_gamma;
@@ -169,6 +231,16 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
     print("Saved $file_out_name \n")
     close(ds)
 
+    tdiff = abs(sum(sum(grad.*eps))) 
+    println("Increment size is $(tdiff)") 
+    if tdiff < 2e-5
+        println("HITTING BELOW THE THRESHOLD!!!!!")
+        println("STOPPING...")
+        # Stop the julia script
+        exit(0)
+
+        
+    end 
 
 
 end 

@@ -4,15 +4,15 @@ include("forward_phyto/run_forward_model.jl")
 include("backward_lambda/run_backward_model.jl")
 
 # First run where gamma is calculated based on physical mechanisms 
-run_forward_model("forward_1.nc", "FIRST")
-run_backward_model("adjoint_1.nc", "forward_1.nc")
+run_forward_model("forward_1", "FIRST")
+run_backward_model("adjoint_1", "forward_1")
 
 
 # Iterate! 
-for i in 2:200
+for i in 2:10
     println("Running forward model iteration: $i")
-    run_forward_model("forward_$i.nc", "adjoint_$(i-1).nc")
-    run_backward_model("adjoint_$i.nc", "forward_$i.nc")
+    run_forward_model("forward_$i", "adjoint_$(i-1)")
+    run_backward_model("adjoint_$i", "forward_$i")
 end
 
 

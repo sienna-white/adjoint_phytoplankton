@@ -82,8 +82,12 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
         profile = df[!, time_step]   # Get profile data at that point 
         profile = profile .* 1e-6 
         difference = 2* (ds_algae["algae1"][:, time_step_int] - profile) 
+        
+        println("Found a profile at time step $(time_step)\n")
+        # println("Profile at time step $(time_step) is $(profile)\n")
+        println("Algae at time step $(time_step) is $(ds_algae["algae1"][1:3, time_step_int])\n")
+        print("Difference is $(difference[1:3])\n")
         adj_forcing[time_step_int] = difference 
-        # println("Found a profile at time step $(time_step)\n")
     end 
 
     # print(adj_forcing)
@@ -171,7 +175,7 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
 
         # initial condition 
         if haskey(adj_forcing, i)
-            println("adj has forcing @ time $(i)")
+            # println("adj has forcing @ time $(i)")
             dL = dL .+ adj_forcing[i].*dt 
         end 
 
@@ -219,7 +223,8 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
     # println("Size of output lambda: $(size(output["lambda"]))")
 
     grad = ds_algae["gamma"][:,:] .* output["lambda"]
-    eps = 2
+    println("grad: $(grad[1:5])")
+    eps = 1e-2
 
     new_gamma = @. ds_algae["gamma"][:,:] - grad*eps 
 

@@ -9,7 +9,7 @@ run_backward_model("adjoint_1", "forward_1")
 
 
 # Iterate! 
-for i in 2:10
+for i in 2:300
     println("Running forward model iteration: $i")
     run_forward_model("forward_$i", "adjoint_$(i-1)")
     run_backward_model("adjoint_$i", "forward_$i")

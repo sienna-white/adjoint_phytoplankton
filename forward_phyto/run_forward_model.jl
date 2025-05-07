@@ -95,10 +95,10 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
     init_algae = 0.005
 
     algae1 = Dict("k" => 0.034,              # specific light attenuation coefficient [cm^2 / 10^6 cells]
-                "pmax" => 0.05 * hr2s,           # maximum specific growth rate [1/hour]
+                "pmax" => 0.006 * hr2s,           # maximum specific growth rate [1/hour]
                 "ws" => 1.38e-4, #1.38e-4,           # vertical velocity [m/s]
                 "Hi" => 40,                # half-saturation of light-limited growth [mu mol photons * m^2/s]
-                "Li" => 0.03 * hr2s,             # specific loss rate [1/hour]
+                "Li" => 0.0002 * hr2s,             # specific loss rate [1/hour]
                 "name" => "HAB",           # name of the species
                 "self_shading" => true)    # self-shading effect (true/false)
     # '''
@@ -215,9 +215,8 @@ end
 
 
 
-# file_out_name = "phyto_GUESS_2"  
-
-# run_forward_model(file_out_name, "FIRST")
+file_out_name = "phyto_fake_truth"  
+run_forward_model(file_out_name, "FIRST")
 
 # @profilehtml run_my_model(ws1, ws2, pmax1, pmax2, file_out_name)
 

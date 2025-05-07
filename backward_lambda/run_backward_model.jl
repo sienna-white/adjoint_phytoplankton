@@ -66,7 +66,7 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
     adj_forcing = Dict() 
 
     # Read csv file 
-    df = CSV.read("/pscratch/sd/s/siennaw/stockton_field_data/profiler/profiles_cells_august_13.csv", DataFrame)
+    df = CSV.read("/pscratch/sd/s/siennaw/stockton_field_data/profiler/profiles_cells_august_13_CLEANED.csv", DataFrame)
     
 
     # Get list of columns
@@ -82,11 +82,12 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
         profile = df[!, time_step]   # Get profile data at that point 
         profile = profile .* 1e-6 
         difference = 2* (ds_algae["algae1"][:, time_step_int] - profile) 
+        difference[1:20] .= 0 
         
         println("Found a profile at time step $(time_step)\n")
         # println("Profile at time step $(time_step) is $(profile)\n")
         println("Algae at time step $(time_step) is $(ds_algae["algae1"][1:3, time_step_int])\n")
-        print("Difference is $(difference[1:3])\n")
+        print("Difference is $(difference[end-2:end])\n")
         adj_forcing[time_step_int] = difference 
     end 
 
@@ -224,7 +225,7 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
 
     grad = ds_algae["gamma"][:,:] .* output["lambda"]
     println("grad: $(grad[1:5])")
-    eps = 1e-2
+    eps = 1e-1
 
     new_gamma = @. ds_algae["gamma"][:,:] - grad*eps 
 
@@ -238,7 +239,7 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
 
     tdiff = abs(sum(sum(grad.*eps))) 
     println("Increment size is $(tdiff)") 
-    if tdiff < 2e-5
+    if tdiff < 1e-6 # changed from 2 
         println("HITTING BELOW THE THRESHOLD!!!!!")
         println("STOPPING...")
         # Stop the julia script

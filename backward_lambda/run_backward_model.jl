@@ -45,7 +45,7 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
 
     # INITIALIZE THE ADJOINT FORCING --> DIFF BETWEEN MODEL & OBS 
     # println("Initializing with ground truth + some noise")
-    ds_truth = NCDataset("forward_phyto/phyto_TRUTH.nc")
+    ds_truth = NCDataset("/pscratch/sd/s/siennaw/adjoint_phytoplankton/forward_phyto/phyto_fake_truth_august_13.nc")
     # ground_truth_w_noise =  ds_truth["algae1"][:,end] + rand(N).*1e-6
     # c_diff = 2*(ds_algae["algae1"][:,end] - ground_truth_w_noise)
 
@@ -65,31 +65,29 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
     # CREATE dictionary
     adj_forcing = Dict() 
 
-    # Read csv file 
-    df = CSV.read("/pscratch/sd/s/siennaw/stockton_field_data/profiler/profiles_cells_august_13_CLEANED.csv", DataFrame)
+    # # Read csv file 
+    # df = CSV.read("/pscratch/sd/s/siennaw/stockton_field_data/profiler/profiles_cells_august_13_CLEANED.csv", DataFrame)
     
-
-    # Get list of columns
-    time_steps = names(df)
-
-    for i in 1:length(time_steps)
+    # # Get list of columns
+    # time_steps = names(df)
+    # for i in 1:length(time_steps)
         
-        time_step = time_steps[i]
-        if time_step == "z"
-            continue
-        end
-        time_step_int = parse(Int, time_step) # Convert to integer
-        profile = df[!, time_step]   # Get profile data at that point 
-        profile = profile .* 1e-6 
-        difference = 2* (ds_algae["algae1"][:, time_step_int] - profile) 
-        difference[1:20] .= 0 
+    #     time_step = time_steps[i]
+    #     if time_step == "z"
+    #         continue
+    #     end
+    #     time_step_int = parse(Int, time_step) # Convert to integer
+    #     profile = df[!, time_step]   # Get profile data at that point 
+    #     profile = profile .* 1e-6 
+    #     difference = 2* (ds_algae["algae1"][:, time_step_int] - profile) 
+    #     difference[1:20] .= 0 
         
-        println("Found a profile at time step $(time_step)\n")
-        # println("Profile at time step $(time_step) is $(profile)\n")
-        println("Algae at time step $(time_step) is $(ds_algae["algae1"][1:3, time_step_int])\n")
-        print("Difference is $(difference[end-2:end])\n")
-        adj_forcing[time_step_int] = difference 
-    end 
+    #     println("Found a profile at time step $(time_step)\n")
+    #     # println("Profile at time step $(time_step) is $(profile)\n")
+    #     println("Algae at time step $(time_step) is $(ds_algae["algae1"][1:3, time_step_int])\n")
+    #     print("Difference is $(difference[end-2:end])\n")
+    #     adj_forcing[time_step_int] = difference 
+    # end 
 
     # print(adj_forcing)
     # println("Column names: ", col_names)
@@ -97,20 +95,14 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
     # par = df[!,"Sol Rad (PAR)"]
 
     # # Let's say we have observations at times 
-    # for i in 1:500:M
-    #     # measurement is at depth N = 20
-    #     OBS_DEPTH = 20 
-    #     forcing = zeros(N)
-    #     forcing[OBS_DEPTH] =  2*(ds_algae["algae1"][OBS_DEPTH, i] - (ds_truth["algae1"][OBS_DEPTH, i] + rand()*1e-6))
-    #     adj_forcing[i] = forcing
-    # end
-
-
+    for i in 1:500:M
+        # OBS_DEPTH = 20         # measurement is at depth N = 20
+        forcing = zeros(N)
+        forcing[10:end] = @. 2*(ds_algae["algae1"][10:end, i] - (ds_truth["algae1"][10:end, i] ))#+ rand()*1e-6))
+        adj_forcing[i] = forcing
+    end
 
     # println("Size of ds_algae gamma: $(size(ds_algae["gamma"][:,:]))")
-
-
-
 
     # Increments for saving profiles. set to 1 to save all; 10 saves every 10th, etc. 
     isave = 1 #1000
@@ -225,9 +217,9 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
 
     grad = ds_algae["gamma"][:,:] .* output["lambda"]
     println("grad: $(grad[1:5])")
-    eps = 1e-1
+    eps = 0.5
 
-    new_gamma = @. ds_algae["gamma"][:,:] - grad*eps 
+    new_gamma = @. ds_algae["gamma"][:,:] - grad*eps # plus or minus???
 
 
     v = defVar(ds, "gamma", Float64,("z","time"), attrib = OrderedDict(
@@ -239,7 +231,7 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String)
 
     tdiff = abs(sum(sum(grad.*eps))) 
     println("Increment size is $(tdiff)") 
-    if tdiff < 1e-6 # changed from 2 
+    if tdiff < 1e-10 #1e-6 # changed from 2 
         println("HITTING BELOW THE THRESHOLD!!!!!")
         println("STOPPING...")
         # Stop the julia script

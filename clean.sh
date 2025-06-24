@@ -3,6 +3,7 @@ rm adjoint_*
 cd ../forward_phyto
 rm forward_*
 cd .. 
+rm cost.txt 
 echo  "done"
 
 

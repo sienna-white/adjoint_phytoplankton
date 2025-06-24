@@ -11,6 +11,6 @@
 "Li" => 0.005 * hr2s,             # specific loss rate [1/hour]
 
 
-
-
-    
+June 23 / 2025
+Trying to split up growth + loss in the adjoint model. Right now it's not working but hopefully soon!
+Split them up, and added a penalty function following guidance from this paper: https://www.mdpi.com/2072-4292/15/1/148

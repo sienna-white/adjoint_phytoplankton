@@ -7,7 +7,6 @@ specific_heat_air = 1007 # J/kg-degCxrh
 c_d = 0.05   # Drag coefficient 
 
 function get_pressure_at_timestamp(time::Real, Px0::Real, T_Px::Real, phase_shift=0)
-
     if T_Px == 0
         return Px0
     else

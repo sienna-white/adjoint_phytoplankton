@@ -7,7 +7,6 @@ include("backward_lambda/run_backward_model.jl")
 run_forward_model("forward_1", "FIRST")
 run_backward_model("adjoint_1", "forward_1")
 
-
 # Iterate! 
 for i in 2:500
     println("Running forward model iteration: $i")

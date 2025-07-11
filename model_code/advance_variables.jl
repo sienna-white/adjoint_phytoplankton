@@ -340,3 +340,63 @@ function advance_Q2L(past_var::Dict, ustar::Real, discretization::Dict, B1=B1, k
     # Q2L  = add_noise_floor(Q2L)
     return  Q2L 
 end 
+
+
+function advance_lagrangian_multiplier(algae, Lpast, diffusivity, gamma, discretization, penalty, cost)
+    N = discretization["N"]
+    beta = discretization["beta"]
+    dt = discretization["dt"]
+    dz = discretization["dz"]
+
+    aL, bL, cL, dL = initialize_abcd(N)
+
+    ws = algae["ws"]
+    kz = diffusivity
+
+    wsdtdz = abs(ws*dt)/dz
+    mult = (dt/dz^2)*(1/2)
+    if ws>0
+        for i in 2:(N-1)
+            aL[i] =  -ws*dt/dz - mult*(kz[i-1] + kz[i])
+            bL[i] = 1 + ws*dt/dz - gamma[i]*dt + mult*(kz[i+1] + 2*kz[i] + kz[i-1])
+            cL[i] = -mult * (kz[i] + kz[i+1])
+            dL[i] = Lpast[i] + penalty[i]*dt + cost[i]*dt 
+        end
+    
+
+    # Bottom-Boundary: no flux for scalars
+    bL[1] =  1 + ws*dt/dz -(gamma[1]*dt) + mult*(kz[1] + kz[2]) 
+    cL[1] =  -ws*dt/dz - mult * (kz[1] + kz[2])
+    dL[1] =  Lpast[1] + penalty[1]*dt + cost[1]*dt 
+
+    # Top-Boundary: no flux for scalars
+    aL[end] = -mult * (kz[end] + kz[end-1])
+    bL[end] = ws*dt/dz + 1 - gamma[end]*dt + mult*(kz[end] + kz[end-1])  
+    dL[end] = Lpast[end] + penalty[end]*dt + cost[end]*dt 
+     
+
+   # ********** If settling speed is DOWNWARD (sinking!) **********
+    else
+        for i in 2:(N-1)
+            aL[i]  = -wsdtdz - mult*(kz[i-1]+ kz[i]) 
+            bL[i]  = 1 + wsdtdz - gamma[i]*dt  + mult*(kz[i+1] + 2*kz[i] + kz[i-1]) 
+            cL[i]  = -mult * (kz[i] + kz[i+1])
+            dL[i]  = Lpast[i] + penalty[i]*dt + cost[i]*dt 
+        end 
+           
+        # Bottom-Boundary: no flux for scalars
+        bL[1] =  1 + wsdtdz - (gamma[1]*dt) + mult*(kz[2] + kz[1]) 
+        cL[1] =  -wsdtdz - mult*(kz[2] + kz[1])
+        dL[1] =  Lpast[1] + penalty[1]*dt + cost[1]*dt 
+
+        # Top-Boundary: no flux for scalars
+        aL[end] =  -mult * (kz[end] + kz[end-1])
+        bL[end] =  1 - gamma[end]*dt + mult * (kz[end] + kz[end-1]) + wsdtdz # okay adding this here 
+        dL[end] = Lpast[end] + penalty[end]*dt + cost[end]*dt  
+    end 
+
+    # Solve the tridiagonal system
+    A = TDMA(aL, bL, cL, dL, N) 
+    
+    return A
+end 

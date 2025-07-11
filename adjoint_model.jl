@@ -14,7 +14,6 @@ for i in 2:500
     run_backward_model("adjoint_$i", "forward_$i")
 end
 
-
 # run_forward_model("forward_2.nc", "adjoint_1.nc")
 # run_backward_model("adjoint_2.nc", "forward_2.nc")
 
@@ -23,8 +22,6 @@ end
 
 # run_forward_model("forward_4.nc", "adjoint_3.nc")
 # run_backward_model("adjoint_4.nc", "forward_4.nc")
-
-
 
 # # Run forward model 
 # forward_model_name = "forward_phyto_1.nc" 

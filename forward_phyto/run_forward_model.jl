@@ -14,12 +14,13 @@ using LaTeXStrings
 using Profile
 using Statistics 
 
-include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/calculate_physical_variables.jl") 
-include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/advance_variables.jl")
-include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/phytoplankton.jl")
-include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/forcings.jl") 
-include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/output.jl")
-include("/pscratch/sd/s/siennaw/adjoint_phytoplankton/model_code/define_params.jl")
+fp="/global/homes/s/siennaw/scratch/siennaw/two_species/adjoint_phytoplankton/model_code"
+include("/global/homes/s/siennaw/scratch/siennaw/two_species/adjoint_phytoplankton/model_code/calculate_physical_variables.jl") 
+include("/global/homes/s/siennaw/scratch/siennaw/two_species/adjoint_phytoplankton/model_code/advance_variables.jl")
+include("/global/homes/s/siennaw/scratch/siennaw/two_species/adjoint_phytoplankton/model_code/phytoplankton.jl")
+include("/global/homes/s/siennaw/scratch/siennaw/two_species/adjoint_phytoplankton/model_code/forcings.jl") 
+include("/global/homes/s/siennaw/scratch/siennaw/two_species/adjoint_phytoplankton/model_code/output.jl")
+include("/global/homes/s/siennaw/scratch/siennaw/two_species/adjoint_phytoplankton/model_code/define_params.jl")
 
 
 function run_forward_model(file_out_name::String, adjoint_ds::String)
@@ -32,11 +33,11 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
     M  = global_params["M"]  # number of time steps
     time_range = global_params["time_range"] # number of time steps
 
+
     file_out_name = "$(file_out_name)_$(time_range).nc"
     println("\n\nRunning the FORWARD PHYTOPLANKTON MODEL --> we are going forward in time")
     println("Adjusting our growth guess using the gamma from: $(adjoint_ds)")
     println("Will be saving phytoplankton output to: $(file_out_name)")
-
 
     # Hydrodynamic dataset 
     ds = NCDataset("/pscratch/sd/s/siennaw/adjoint_phytoplankton/run_hydro/HYDRO_$time_range.nc")
@@ -65,7 +66,7 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
 
     # Increments for saving profiles. set to 1 to save all; 10 saves every 10th, etc. 
     isave = 1 
-    var2save = ["algae1", "gamma"]      # Only save growth + algae 
+    var2save = ["algae1", "gamma1", "algae2", "gamma2"]      # Only save growth + algae 
 
     create_output_dict(M, isave, var2save, N)
 
@@ -85,15 +86,23 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
     background_turbidity =  1
 
     #********************** DEFINE PHYTOPLANKTON FORCINGS ***************************
-    init_algae = 0.005
+    init_algae = 0.005/2
 
     algae1 = Dict("k" => 0.034,              # specific light attenuation coefficient [cm^2 / 10^6 cells]
-                "pmax" => 1e-4 * hr2s,           # maximum specific growth rate [1/hour]
+                "pmax" => 0.005 * hr2s,           # maximum specific growth rate [1/hour]
                 "ws" => 1.38e-4, #1.38e-4,           # vertical velocity [m/s]
                 "Hi" => 40,                # half-saturation of light-limited growth [mu mol photons * m^2/s]
                 "Li" => 0.005 * hr2s,             # specific loss rate [1/hour]
                 "name" => "HAB",           # name of the species
                 "self_shading" => true)    # self-shading effect (true/false)
+
+    algae2 = Dict("k" => 0.034,              # specific light attenuation coefficient [cm^2 / 10^6 cells]
+            "pmax" => 0.05 * hr2s,           # maximum specific growth rate [1/hour]
+            "ws" => -1.38e-5,           # vertical velocity [m/s]
+            "Hi" => 40,                # half-saturation of light-limited growth [mu mol photons * m^2/s]
+            "Li" => 0.005 * hr2s,             # specific loss rate [1/hour]
+            "name" => "Diatoms",           # name of the species
+            "self_shading" => true)    # self-shading effect (true/false)
     # '''
     # Diatoms ws = -1.38e-5 m/s
     # Cyanobacteria = 1.38e-4 m/s
@@ -107,7 +116,7 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
     discretization = Dict("beta" => (dt/dz^2), "dz" => dz, "dt" => dt, "N" => N, "z"=> z, "H" => H)
 
     algae1["c"] = zeros(N) .+ init_algae 
-    # algae2["c"] = zeros(N) .+ 1e-3 #@init_algae 
+    algae2["c"] = zeros(N) .+ init_algae*1.5
 
     # Create vector to hold the time steps 
     Times = collect(1:dt:(M*dt))
@@ -115,7 +124,7 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
 
     #***************************************************************************
     save2output(1, 1, "algae1", algae1["c"])
-    # save2output(1, 1, "algae2", algae2["c"])
+    save2output(1, 1, "algae2", algae2["c"])
 
     variables = Dict("Kz" => ds["Kz"][:,1])
 
@@ -132,30 +141,36 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
             I0 = get_light(i)
             # light = self_shading(algae1, algae2, I0, background_turbidity, discretization)
             light = light_decay(I0, background_turbidity, discretization)
-            growth = zeros(N)
+            growth1 = zeros(N)
+            growth2 = zeros(N)
             for i in 1:N 
-                growth[i] = algae1["pmax"] * light[i]/(algae1["Hi"] + light[i]) 
+                growth1[i] = algae1["pmax"] * light[i]/(algae1["Hi"] + light[i]) 
+                growth2[i] = algae2["pmax"] * light[i]/(algae2["Hi"] + light[i])
             end
 
         else 
-            growth = gamma_ds["gamma"][:,i]
+            growth1 = gamma_ds["gamma1"][:,i]
+            growth2 = gamma_ds["gamma2"][:,i]
         end 
 
         # Split up loss + growth
-        gamma = growth .- algae1["Li"]  # subtract the loss rate
+        gamma1 = growth1 .- algae1["Li"]  # subtract the loss rate
+        gamma2 = growth2 .- algae2["Li"]  # subtract the loss rate
 
         # Algae 
-        algae1["c"] = advance_algae(variables, algae1, gamma, discretization)  # zeros(N) .+ init_algae  #
-        save2output(time, i, "gamma", growth)
+        algae1["c"] = advance_algae(variables, algae1, gamma1, discretization)  
+        algae2["c"] = advance_algae(variables, algae2, gamma2, discretization) 
+
+        save2output(time, i, "gamma1", growth1)
+        save2output(time, i, "gamma2", growth2)
         save2output(time, i, "algae1", algae1["c"])
+        save2output(time, i, "algae2", algae2["c"])
 
         if algae1["c"][1] > 1
             println("Time: $(time) \t algae1: $(algae1["c"][1]) \t gamma: $(gamma[1])")
         end
 
     end
-
-
 
     # ********************** save data ****************************
     units_dict = Dict("U" => "m/s", 
@@ -168,23 +183,25 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
         "N_BV2" => "Brunt-Vaisala frequency", 
         "Kq" => "Kq", 
         "Nu" => "Nu_t",
-        "gamma" => "Net growth rate",)
+        "gamma1" => "Net growth rate for algae1",
+        "gamma2" => "Net growth rate for algae2")
 
     var2name = Dict("U" => "Velocity", 
                 "C" => "Temperature", 
                 "Kz" => "Turbulent diffusivity", 
-                "algae1" => "Diatom concentration",
-                "algae2" => "HAB concentration",
+                "algae1" => "HAB concentration",
+                "algae2" => "Diatom concentration",
                 "L" => "Turbulent length scale", 
                 "Q2" => "TKE",
                 "Q2L" => "TKE*L",
                 "N_BV2" => "Brunt-Vaisala frequency", 
                 "Kq" => "Kq", 
                 "Nu" => "Nu_t", 
-                "gamma" => "Net growth rate [1/s]")
+                "gamma1" => "Net growth rate [1/s]",
+                "gamma2" => "Net growth rate [1/s]")
 
 
-    fout = "/pscratch/sd/s/siennaw/adjoint_phytoplankton/forward_phyto/$(file_out_name)"
+    fout = "forward_phyto/$(file_out_name)"
 
     ds = NCDataset(fout,"c")
     nt = div(M,isave) + 1 
@@ -198,12 +215,10 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
     v[:] = collect(1:nt)
 
     for var in var2save
-        # println(var)
         v = defVar(ds, var, Float64,("z","time"), attrib = OrderedDict(
         "units" =>  units_dict[var], "long_name" => var2name[var]))
         v[:,:] = output[var];
     end
-
 
     print("Saved $file_out_name \n")
     close(ds)

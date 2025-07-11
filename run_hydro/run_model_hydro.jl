@@ -21,10 +21,11 @@ include("../model_code/forcings.jl")
 include("../model_code/output.jl")
 include("../model_code/define_params.jl")
 
-file_out_name = @sprintf("HYDRO") 
+file_out_name = @sprintf("HYDRO_AUGUST6-16") 
 
 function run_my_model(file_out_name::String)
 
+    forcing_folder = "/pscratch/sd/s/siennaw/stockton_field_data/forcing_for_model/2024/august6-16"
 
     #********************** SPATIAL DOMAIN  ***************************
     N = global_params["N"]   # number of grid points
@@ -32,13 +33,15 @@ function run_my_model(file_out_name::String)
     dz = global_params["dz"] # grid spacing - may need to adjust to reduce oscillations
     dt = global_params["dt"] # (seconds) size of time step
     M  = global_params["M"]  # number of time steps
+    @info "Running with $M time steps"
     time_range = global_params["time_range"] # number of time steps
 
-    file_out_name = @sprintf("HYDRO_%s.nc", time_range)
+    file_out_name = @sprintf("%s.nc", file_out_name)
+    println("Running model with file_out_name = ", file_out_name)
     #***********************************************************************
     # Read in the feather file 
     
-    data  = Arrow.Table("/pscratch/sd/s/siennaw/stockton_field_data/forcing_for_model/interpolated_temperature_profile_$time_range.feather")
+    data  = Arrow.Table("$(forcing_folder)/interpolated_temperature_profile.feather")
     temp_data = DataFrame(data)
 
     function get_temp_field(index::Int, temp_data=temp_data)
@@ -51,7 +54,7 @@ function run_my_model(file_out_name::String)
 
     #***********************************************************************
     # Read in the CIMIS data
-    cimis_fn = "/pscratch/sd/s/siennaw/stockton_field_data/forcing_for_model/PAR_on_$time_range.csv"
+    cimis_fn = "$(forcing_folder)/PAR.csv" 
     df = CSV.read(cimis_fn, DataFrame)
     par = df[!,"Sol Rad (PAR)"]
     println("Read in CIMIS data ...")
@@ -64,7 +67,7 @@ function run_my_model(file_out_name::String)
 
     #***********************************************************************
     # Wind time series 
-    wind_fn = "/pscratch/sd/s/siennaw/stockton_field_data/forcing_for_model/wind_on_$time_range.csv"
+    wind_fn = "$(forcing_folder)/wind.csv"
     df = CSV.read(wind_fn, DataFrame)
     wind = df[!,"WindSpeed"]
     real_time = df[!,"time"]
@@ -80,7 +83,7 @@ function run_my_model(file_out_name::String)
 
     # Increments for saving profiles. set to 1 to save all; 10 saves every 10th, etc. 
     isave = 1 
-    var2save = ["U", "C", "Kz", "L", "Q2","N_BV2"]
+    var2save = ["U", "C", "Kz"] #, "L", "Q2","N_BV2"]
 
     create_output_dict(M, isave, var2save, N)
 
@@ -139,9 +142,15 @@ function run_my_model(file_out_name::String)
     Q2, Q2L, Q, L, Gh, nu_t, Kq, Kz = initialize_turbulent_functions(discretization, N_BV2)
 
     # Initial dictionary to store variables
-    variables = Dict("U" => U, "C" => C, "N_BV2" => N_BV2, 
-                    "Nu" => nu_t, "Q2" => Q2, "Q2L" => Q2L, 
-                    "Kq" => Kq, "Kz" => Kz, "L" => L)
+    variables = Dict("U" => U,
+                     "C" => C, 
+                    "Kz" => Kz,
+                    "N_BV2" => N_BV2,  
+                    "Nu" => nu_t, 
+                    "Q2" => Q2, 
+                    "Q2L" => Q2L, 
+                    "Kq" => Kq,  
+                    "L" => L)
 
                     
     Times = collect(1:dt:(M*dt))
@@ -154,9 +163,9 @@ function run_my_model(file_out_name::String)
     save2output(1, 1, "U", variables["U"])
     save2output(1, 1, "Kz", variables["Kz"])
     save2output(1, 1, "C", variables["C"])
-    save2output(1, 1, "L", variables["L"])
-    save2output(1, 1, "Q2", variables["Q2"])
-    save2output(1, 1, "N_BV2", variables["N_BV2"])
+    # save2output(1, 1, "L", variables["L"])
+    # save2output(1, 1, "Q2", variables["Q2"])
+    # save2output(1, 1, "N_BV2", variables["N_BV2"])
     # push!(real_times_saved, real_time[1])
 
     for i in 2:M
@@ -210,9 +219,9 @@ function run_my_model(file_out_name::String)
         save2output(time, i, "U", variables["U"])
         save2output(time, i, "Kz", variables["Kz"])
         save2output(time, i, "C", variables["C"])
-        save2output(time, i, "L", variables["L"])
-        save2output(time, i, "Q2", variables["Q2"])
-        save2output(time, i, "N_BV2", variables["N_BV2"])
+        # save2output(time, i, "L", variables["L"])
+        # save2output(time, i, "Q2", variables["Q2"])
+        # save2output(time, i, "N_BV2", variables["N_BV2"])
         # push!(real_times_saved, real_time[i])
 
     end
@@ -239,25 +248,20 @@ function run_my_model(file_out_name::String)
                 "Q2" => "TKE","Q2L" => "TKE*L",
                 "N_BV2" => "Brunt-Vaisala frequency", "Kq" => "Kq", "Nu" => "Nu_t")
 
-    times_unique = unique(times) 
-
     
-    # Print shape of 
-    # println("Length of times_unique = ", length(times_unique))
-    println("start + end of times unique $(times_unique[1]) $(times_unique[end])")
-    println("Times unique has $(length(times_unique)) elements \n")
+
 
     ds = NCDataset(file_out_name,"c")
 
-    # model_time = collect(1:M)
+    nt = div(M,isave) + 1 
     defDim(ds, "z", length(z)) 
-    defDim(ds, "time", length(times_unique))
+    defDim(ds, "time", nt)
 
     v = defVar(ds, "z", Float32, ("z",))
     v[:] = z
 
     v = defVar(ds, "time", Float32, ("time",), attrib = OrderedDict("units" => "seconds"))
-    v[:] = collect(1:(length(times_unique))) #model_time
+    v[:] = collect(1:nt) #model_time
 
     for var in var2save
         # println(var)

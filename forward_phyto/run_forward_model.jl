@@ -30,17 +30,28 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
     H = global_params["H"]   # depth (meters)
     dz = global_params["dz"] # grid spacing - may need to adjust to reduce oscillations
     dt = global_params["dt"] # (seconds) size of time step
-    M  = global_params["M"]  # number of time steps
+    # M  = global_params["M"]  # number of time steps
     time_range = global_params["time_range"] # number of time steps
+
+
+    istart = global_params["istart"] # start time step
+    iend = global_params["iend"] # end time step
+    M = iend - istart + 1 # number of time steps
+    if M <= 0
+        error("M must be greater than 0. Check istart and iend values.")
+    end
+    time_index_vec = collect(istart:iend)
+
 
 
     file_out_name = "$(file_out_name)_$(time_range).nc"
     println("\n\nRunning the FORWARD PHYTOPLANKTON MODEL --> we are going forward in time")
-    println("Adjusting our growth guess using the gamma from: $(adjoint_ds)")
-    println("Will be saving phytoplankton output to: $(file_out_name)")
+    println("\t Adjusting our growth guess using the gamma from: $(adjoint_ds)")
+    println("\t Will be saving phytoplankton output to: $(file_out_name)")
 
+    forcing_folder = "/pscratch/sd/s/siennaw/stockton_field_data/forcing_for_model/2024/august6-16/"
     # Hydrodynamic dataset 
-    ds = NCDataset("/pscratch/sd/s/siennaw/adjoint_phytoplankton/run_hydro/HYDRO_$time_range.nc")
+    ds = NCDataset("/pscratch/sd/s/siennaw/two_species/adjoint_phytoplankton/run_hydro/HYDRO_$time_range.nc")
 
     # If this is the first iteration, we need to calculate gamma based on the light and 
     # provided phytoplankton growth rate
@@ -48,8 +59,8 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
         calculate_gamma = true 
         println("First run: calculating gamma")
                 
-        # Read in the CIMIS data
-        cimis_fn = "/pscratch/sd/s/siennaw/stockton_field_data/forcing_for_model/PAR_on_$time_range.csv"
+        # Read in the CIMIS data 
+        cimis_fn = "$(forcing_folder)/PAR.csv"
         df = CSV.read(cimis_fn, DataFrame)
         par = df[!,"Sol Rad (PAR)"]
         println("Read in CIMIS data ...")
@@ -84,9 +95,8 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
 
     # (4) Light 
     background_turbidity =  1
-
+    
     #********************** DEFINE PHYTOPLANKTON FORCINGS ***************************
-    init_algae = 0.005/2
 
     algae1 = Dict("k" => 0.034,              # specific light attenuation coefficient [cm^2 / 10^6 cells]
                 "pmax" => 0.005 * hr2s,           # maximum specific growth rate [1/hour]
@@ -115,8 +125,16 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
     # Create dictionary to hold important discretization parameters
     discretization = Dict("beta" => (dt/dz^2), "dz" => dz, "dt" => dt, "N" => N, "z"=> z, "H" => H)
 
-    algae1["c"] = zeros(N) .+ init_algae 
-    algae2["c"] = zeros(N) .+ init_algae*1.5
+    chla2cell_mc =  1e-6/0.36  # ug chl-a/ml --> pg chl-a/ml --> 0.36  pg chl-a/cell Microcystis
+    chla2cell_diatom = 1e-6/4 
+    init_algae = 0.004/2 # SW change was 0.01
+    init_conc = 12810 #10810
+    mult = 1.8
+    init_algae = init_conc/(1/chla2cell_mc + mult/chla2cell_diatom)
+    # print("Initial algae concentration: $(init_algae) cells \n")
+
+    algae1["c"] = zeros(N) .+ init_algae #/2 #(init_conc*0.01     # init_algae 
+    algae2["c"] = zeros(N) .+ init_algae*mult #/2 # (init_conc* 0.002303 # init_algae*2
 
     # Create vector to hold the time steps 
     Times = collect(1:dt:(M*dt))
@@ -167,7 +185,7 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
         save2output(time, i, "algae2", algae2["c"])
 
         if algae1["c"][1] > 1
-            println("Time: $(time) \t algae1: $(algae1["c"][1]) \t gamma: $(gamma[1])")
+            println("Time: $(time) \t algae1: $(algae1["c"][1]) \t gamma: $(gamma1[1])")
         end
 
     end

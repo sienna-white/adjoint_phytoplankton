@@ -3,15 +3,24 @@
 include("forward_phyto/run_forward_model.jl") 
 include("backward_lambda/run_backward_model.jl")
 
+
+#0.5, 
+step_sizes = [20, 10, 5 , 5, 5, 5, 5,1, 1, 1, 1, 1,1,1, 0.01,  0.01, 0.01,  0.01, 0.01,  0.01, 0.01, 0.01, 0.01,0.01, 0.01,0.01, 0.01,0.01, 0.01,0.01, 0.01,0.01, 0.01,0.01, 0.01, 0.01, 0.01,0.001, 0.001] # Different step sizes to try
+# step_sizes = [10, 0.1, 0.01, 0.01, 0.01, 0.01, 0.001, 0.001, 0.001] # Different step sizes to try
+
+
+
 # First run where gamma is calculated based on physical mechanisms 
 run_forward_model("forward_1", "FIRST")
-run_backward_model("adjoint_1", "forward_1")
+run_backward_model("adjoint_1", "forward_1", step_sizes[1])
+
 
 # Iterate! 
-for i in 2:500
+for i in 2:length(step_sizes)
     println("Running forward model iteration: $i")
     run_forward_model("forward_$i", "adjoint_$(i-1)")
-    run_backward_model("adjoint_$i", "forward_$i")
+    run_backward_model("adjoint_$i", "forward_$i", step_sizes[i]*2)
+    
 end
 
 # run_forward_model("forward_2.nc", "adjoint_1.nc")

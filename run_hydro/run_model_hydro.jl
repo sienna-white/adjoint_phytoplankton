@@ -21,18 +21,18 @@ include("../model_code/forcings.jl")
 include("../model_code/output.jl")
 include("../model_code/define_params.jl")
 
-file_out_name = @sprintf("HYDRO_AUGUST6-16") 
+file_out_name = @sprintf("HYDRO_AUGUST6-28") 
 
 function run_my_model(file_out_name::String)
 
-    forcing_folder = "/pscratch/sd/s/siennaw/stockton_field_data/forcing_for_model/2024/august6-16"
+    forcing_folder = "/pscratch/sd/s/siennaw/stockton_field_data/forcing_for_model/2024/august6-28"
 
     #********************** SPATIAL DOMAIN  ***************************
     N = global_params["N"]   # number of grid points
     H = global_params["H"]   # depth (meters)
     dz = global_params["dz"] # grid spacing - may need to adjust to reduce oscillations
     dt = global_params["dt"] # (seconds) size of time step
-    M  = global_params["M"]  # number of time steps
+    M  = 190081 #global_params["M"]  # number of time steps
     @info "Running with $M time steps"
     time_range = global_params["time_range"] # number of time steps
 

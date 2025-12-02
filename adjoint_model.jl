@@ -4,24 +4,36 @@ include("forward_phyto/run_forward_model.jl")
 include("backward_lambda/run_backward_model.jl")
 
 
-#0.5, 
-step_sizes = [20, 10, 5 , 5, 5, 5, 5,1, 1, 1, 1, 1,1,1, 0.01,  0.01, 0.01,  0.01, 0.01,  0.01, 0.01, 0.01, 0.01,0.01, 0.01,0.01, 0.01,0.01, 0.01,0.01, 0.01,0.01, 0.01,0.01, 0.01, 0.01, 0.01,0.001, 0.001] # Different step sizes to try
-# step_sizes = [10, 0.1, 0.01, 0.01, 0.01, 0.01, 0.001, 0.001, 0.001] # Different step sizes to try
+#0.5,  5, 5, 5,  5, 5, 5,  5, 5,  5, 5,  5, 5, 5,  
+step_sizes = [ 20,  10, 10, 5 , 5,5, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1 , 1, 1, 1, 1, 1 , 1, 1, 1, 1, 1 ,  1, 1, 1, 1, 1, 1 , 1, 1, 1, 1, 1 , 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 , 1, 1, 1, 1, 1 , 1, 1, 1, 1, 1,1, 1, 1, 1, 1, 1 , 1,0.1,0.1, 0.1, 0.1, 0.1,  0.01,  0.01, 0.01,  0.01, 0.01,  0.01, 0.01, 0.01, 0.01,0.01, 0.01,0.01, 0.01,0.01, 0.01,0.01, 0.01,0.01, 0.01,0.01, 0.01, 0.01, 0.01,0.001, 0.001] # Different step sizes to try
+# step_sizes = [10, 5 , 1, 1, 1,1, 1, 1, 1, 1, 1, 1, 1, 1 , 1, 1, 1, 1, 1 , 1, 1, 1, 1, 1 , 1,  0.1, 0.1, 0.01, 0.01, 0.01, 0.01, 0.001, 0.001, 0.001] # Different step sizes to try
 
+# step_sizes = [ 20,10, 10,10, 10,10, 10,10, 10,10, 10,10, 10,10, 10,  10, 10, 5 , 5,5, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1 , 1, 1, 1, 1, 1 , 1, 1, 1, 1, 1 , 1, 1, 1, 1, 1, 1 , 1,0.1,0.1, 0.1, 0.1, 0.1,  0.01,  0.01, 0.01,  0.01, 0.01,  0.01, 0.01, 0.01, 0.01,0.01, 0.01,0.01, 0.01,0.01, 0.01,0.01, 0.01,0.01, 0.01,0.01, 0.01, 0.01, 0.01,0.001, 0.001] # Different step sizes to try
+
+# adjoint_39_august_13.nc 1.6584314797922388e10
+# adjoint_181_august_13.nc 1.6237770128660355e10
 
 
 # First run where gamma is calculated based on physical mechanisms 
-run_forward_model("forward_1", "FIRST")
-run_backward_model("adjoint_1", "forward_1", step_sizes[1])
+run_forward_model("forward_mc_1", "FIRST")
+run_backward_model("adjoint_mc_1", "forward_mc_1", step_sizes[1])
 
 
-# Iterate! 
+# # Iterate! 
 for i in 2:length(step_sizes)
     println("Running forward model iteration: $i")
-    run_forward_model("forward_$i", "adjoint_$(i-1)")
-    run_backward_model("adjoint_$i", "forward_$i", step_sizes[i]*2)
+    run_forward_model("forward_mc_$i", "adjoint_mc_$(i-1)")
+    run_backward_model("adjoint_mc_$i", "forward_mc_$i", step_sizes[i])
     
 end
+
+# i = 205 
+# while true
+#     println("Running forward model iteration: $i")
+#     run_forward_model("forward_$i", "adjoint_$(i-1)")
+#     run_backward_model("adjoint_$i", "forward_$i", 3)
+#     global i += 1
+# end
 
 # run_forward_model("forward_2.nc", "adjoint_1.nc")
 # run_backward_model("adjoint_2.nc", "forward_2.nc")

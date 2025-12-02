@@ -12,7 +12,10 @@ global_params = Dict(
     "H" => 6,    # depth (meters)
     "dz" => 6/60, # grid spacing - may need to adjust to reduce oscillations
     "dt" => 10,  # (seconds) size of time step
-    "M" => 8640, #,86400, # Auugst 6-16   #8640, august 13
-    "time_range" => "AUGUST6-16",
-    "istart" => 1,
-    "iend" => 8640) # number of time steps
+    "M" => 103580, #,86400, # Auugst 6-16   #8640, august 13
+    "time_range" => "august_7",
+    "istart" => 10080,
+    "iend" => 16200) # number of time steps
+# i0:  70560  i1:  76680
+
+

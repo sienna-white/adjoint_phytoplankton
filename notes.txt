@@ -80,3 +80,124 @@ Trying  1.5*Diatoms : MC
 
     
 
+--------
+August 21, 2025
+
+Running 4am - 9pm on August 6th 
+
+1.5* Diatoms 
+    adjoint_38_AUGUST6-16.nc 9.12093637284101e10
+
+1.1 * diatoms 
+    adjoint_1_AUGUST6-16.nc 9.503621351030525e10
+
+1.8 * diatoms 
+    adjoint_14_AUGUST6-16.nc 9.171639287420547e10
+
+Okay commented out the profiler and that's helping significantly
+    mult = 1.5
+    adjoint_9_AUGUST6-16.nc 4.313017839228264e9
+    adjoint_38_AUGUST6-16.nc 3.0597977905013294e9
+    nice! 
+
+Now that i've commented out the penalty function, the cost is decreasing monotonically. Going to keep that commented out for a bit
+Interested in capturing full day's behavior.  
+
+* mult = 1.5
+adjoint_1_AUGUST6-16.nc 4.993708188646639e9
+adjoint_34_AUGUST6-16.nc 3.015243605844312e9
+
+
+* mult = 1.3
+adjoint_32_AUGUST6-16.nc 3.0209540648403788e9
+
+* 1.7 --> down to e8 
+adjoint_34_AUGUST6-16.nc 5.751689006903942e8
+
+1.8 
+adjoint_24_AUGUST6-16.nc 5.744097013173519e8
+
+1:1 gives adjoint_49_AUGUST6-16.nc 5.3273957442373466e8
+upper iteration step sizes ... 
+
+takinga break i feel like we need more diatoms to get that sinking behavior ...
+
+
+
+August 26 2025
+Funny to be modeling august 2024 one year later! Trying to work through each day in august fairly systematically and save results. 
+
+* August 6:
+    adjoint_12_august_06.nc 7.72590641194498e8
+* August 7:
+    adjoint_13_august_07.nc 4.664350595006339e8
+* August 8:
+    adjoint_14_august_08.nc 3.2316334301790905e8
+* August 9:
+    adjoint_56_august_09.nc 2.3881741854100835e8
+* August 10:
+    adjoint_76_august_10.nc 1.6041942594474328e8
+* August 11:
+    adjoint_78_august_11.nc 6.9256964988021e8
+* August 12:
+    adjoint_78_august_12.nc 6.217286146285787e8
+* August 13:
+adjoint_337_august_13.nc 2.0936737474874613e8
+*August 14:
+    adjoint_18_august_14.nc 3.839618571630888e8'
+* August 15:
+    adjoint_6_august_15.nc 1.2909719388005548e10
+    Crazy growth on this day. Very high chl-a! 
+
+* August 16:
+    Very low levels this day. Not much happening. Excellent convegergence 
+    Got down to ~ 1.14e8 
+
+* August 18:
+    adjoint_66_august_18.nc 4.3839553847154754e8
+
+* august 20 
+    poor convegence 
+    adjoint_10_august_20.nc 9.232686321461085e8
+
+* august 22 
+    adjoint_76_august_22.nc 1.0957489153217978e9
+
+* August 23 
+    adjoint_74_august_23.nc 4.1513471702533996e8
+
+*August 24 
+
+August 24:
+    adjoint_84_august_25.nc 3.004376072963796e8
+
+August 26: 
+    adjoint_9_august_26.nc 6.707273866610858e8
+
+adjoint_63_august_27.nc 4.7172527927886313e8
+
+
+
+October 23 2025
+Trying to adjust the diatom : MC ratio based on the mapping data. SEems like way more diatoms than
+MC from a chl-a perspective .. .
+
+
+
+
+
+
+
+
+
+August 14 with the 99% / 1% percent:
+adjoint_50_august_14.nc 2.891670439892723e8
+
+
+Okay,  got the pychocyanin data from Ellen! Trying to see if just setting diatoms =0 will work w/ the adjoint
+
+
+
+(1) August 6 
+adjoint_mc_95_august_6.nc 2.0065993576681283e8
+

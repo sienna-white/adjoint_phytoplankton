@@ -38,9 +38,16 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String, step
     M  = global_params["M"]  # number of time steps
     time_range = global_params["time_range"] # number of time steps
 
+
+    # Read in indices from global_params
+    istart = global_params["istart"] # start time step
+    iend = global_params["iend"] # end time step
+    M = iend - istart + 1 # number of time steps
+    time_index_vec = collect(istart:(iend+1))
+
     file_out_name = "$(file_out_name)_$(time_range).nc"
 
-    ds_hydro = NCDataset("/pscratch/sd/s/siennaw/two_species/adjoint_phytoplankton/run_hydro/HYDRO_$time_range.nc")
+    ds_hydro = NCDataset("/pscratch/sd/s/siennaw/two_species/adjoint_phytoplankton/run_hydro/HYDRO_AUGUST6-28.nc")
     ds_algae = NCDataset("/pscratch/sd/s/siennaw/two_species/adjoint_phytoplankton/forward_phyto/$(algae_guess_ds)_$(time_range).nc")  #"../forward_phyto/phyto_GUESS.nc")
 
     # INITIALIZE THE ADJOINT FORCING --> DIFF BETWEEN MODEL & OBS 
@@ -62,7 +69,7 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String, step
     #     adj_forcing[i] = forcing
     # end
 
-    use_penalty = true 
+    use_penalty = false 
     PMAX = 2e-4
     PMIN = -1e-5
 
@@ -92,38 +99,43 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String, step
         return penalty
     end
 
-    adj_forcing_folder= "/pscratch/sd/s/siennaw/stockton_field_data/forcing_for_model/2024/august6-16"
-    # CREATE dictionary
+    adj_forcing_folder= "/pscratch/sd/s/siennaw/stockton_field_data/forcing_for_model/2024/august6-28"
     adj_forcing = Dict() 
 
-    df = CSV.read("$(adj_forcing_folder)/chla_for_adjoint.csv", DataFrame)
+    df = CSV.read("$(adj_forcing_folder)/microcystis_for_adjoint.csv", DataFrame)
     time_steps = df[!, "model_time"]
     chla_vals = df[!, "VALUE"]
-    chla_conc_vals = df[!, "pg_chla_perML"]
+    chla_conc_vals = df[!, "chla_smoothed"] #.* 1e-2 #pg_chla_perML"]
 
     cost = 0 
-    for i in 1:length(time_steps)  
-        time_step = time_steps[i]
-        if time_step > M 
+
+    #**************************** CHL-A TIME SERIES ***************************
+    for i in 1:length(time_steps) # Loop through all the time steps in the avaialable chl-a data 
+
+        time_step_int = time_steps[i]
+
+        if time_step_int < istart || time_step_int > iend 
             continue
         end
-        time_step_int = time_step + 1 #parse(Int, time_step) # Convert to integer
-        chla_val = chla_vals[i]   # Get profile data at that point 
-        chla_val = chla_val .* 1e-6 
-        # println("chla_val at time step $(time_step_int) is $(chla_val)")
-        total_modeled_algae = ds_algae["algae1"][49:52, time_step_int] .+ ds_algae["algae2"][49:52, time_step_int]
-        # print("..model val at time step is $(total_modeled_algae[1])")
 
-        chla_mc = ds_algae["algae1"][49:52, time_step_int] .* cell2chla_mc
-        chla_diatom = ds_algae["algae2"][49:52, time_step_int] .* cell2chla_diatom
+        model_time = time_step_int - istart + 1         # index for netcdf 
+
+        # chla_val = chla_vals[i]   # Get chl-a data at that point 
+        # chla_val = chla_val .* 1e-6 
+        # println("chla_val at time step $(time_step_int) is $(chla_val)")
+        # total_modeled_algae = ds_algae["algae1"][49:52, time_step_int] .+ ds_algae["algae2"][49:52, time_step_int]
+
+        chla_mc = ds_algae["algae1"][49:52, model_time] .* cell2chla_mc
+        chla_diatom = ds_algae["algae2"][49:52, model_time] .* cell2chla_diatom
         println("total modeled Microcystis = $(mean(chla_mc))")
         println("total modeled Diatom = $(mean(chla_diatom))")
-        total_modeled_chla = chla_mc .+ chla_diatom
-        println("total_modeled_chla = $(mean(total_modeled_chla))")
         println("measured chla = $(chla_conc_vals[i])")
+        total_modeled_chla = chla_mc .+ chla_diatom
+        # println("total_modeled_chla = $(mean(total_modeled_chla))")
+        # println("measured chla = $(chla_conc_vals[i])")
         difference_chla = total_modeled_chla .- chla_conc_vals[i]
         # difference_ = (total_modeled_algae .- chla_val) 
-        # println("Difference at time step $(time_step_int) is $(difference_)")
+        println("Difference at time step $(time_step_int) is $(difference_chla)")
         difference = zeros(N)
         difference[49:52] .= difference_chla #difference_
         cost += sum(abs.(difference_chla.^2)) 
@@ -132,42 +144,50 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String, step
     end 
 
 
-    # # Read csv file 
-    df = CSV.read("$(adj_forcing_folder)/vertical_profiles_for_adjoint_pgML.csv", DataFrame)
+    # #**************************** PROFILER TIME SERIES ***************************
+    # df = CSV.read("$(adj_forcing_folder)/vertical_profiles_for_adjoint_pgML.csv", DataFrame)
     
-    # Get list of columns
-    time_steps = names(df)
-    # println("Time steps in the DataFrame: $(time_steps)")
-    for i in 1:length(time_steps)
+    # # Get list of columns
+    # time_steps = names(df)
+    # for i in 1:length(time_steps)
         
-        time_step = time_steps[i]
-        if time_step == "z" || time_step == "Column1" 
-            continue
-        end
-        time_step_int = parse(Int, time_step) # Convert to integer
-        if time_step_int > M 
-            continue
-        end
-        profile = df[!, time_step]   # Get profile data at that point 
-        profile = profile .* 1e-6 
+    #     time_step = time_steps[i]
 
-        chla_mc = ds_algae["algae1"][:, time_step_int] .* cell2chla_mc
-        chla_diatom = ds_algae["algae2"][:, time_step_int] .* cell2chla_diatom
-        total_modeled_algae = chla_mc .+ chla_diatom
-        difference = total_modeled_algae .- profile 
+    #     # Throw out non-integer columns
+    #     if time_step == "z" || time_step == "Column1" 
+    #         continue
+    #     end
+    #     # Check if time is within the model domain range
+    #     time_step_int = parse(Int, time_step) # Convert to integer
+    #     model_time = time_step_int - istart + 1         # index for netcdf 
+    #     if time_step_int < istart || time_step_int > iend 
+    #         continue
+    #     end
+    #     # println("model_time = $model_time, time_step_int = $time_step_int, time_step = $time_step \n")
+
+    #     profile = df[!, time_step]   # Get profile data at that point 
+    #     profile = profile .* 1e-6 
+
+    #     chla_mc = ds_algae["algae1"][:, model_time] .* cell2chla_mc
+    #     chla_diatom = ds_algae["algae2"][:, model_time] .* cell2chla_diatom
+    #     total_modeled_algae = chla_mc .+ chla_diatom
+    #     difference = total_modeled_algae .- profile 
         
-        cost += sum(abs.(difference.^2))
-        adj_forcing[time_step_int] = difference * 0.08
-    end 
+    #     cost += sum(abs.(difference.^2))
+
+    #     # weight this difference by 0.08 (8% of cost) b/c this data seems less reliable 
+    #     adj_forcing[time_step_int] = difference * 0.08
+    # end 
 
 
+    # Save model cost 
     println("Total cost of adjoint forcing is $(cost)")
     open("cost.txt","a") do io
         println(io,"$file_out_name $cost")
     end
 
     # Increments for saving profiles. set to 1 to save all; 10 saves every 10th, etc. 
-    isave = 1 #1000
+    isave = 1 
     var2save = ["lambda1", "lambda2"]      # Only save growth + algae
 
     create_output_dict(M, isave, var2save, N)
@@ -202,23 +222,24 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String, step
     L2_n = zeros(N)
 
     Times = collect(1:dt:(M*dt))
-    save2output(Times[end], M, "lambda1", L1_n) 
-    save2output(Times[end], M, "lambda2", L2_n)
+
+    save2output(time_index_vec[end], M, "lambda1", L1_n) 
+    save2output(time_index_vec[end], M, "lambda2", L2_n)
 
     for i in (M-1):-1:1
         # println("Time = $i") 
+        index = time_index_vec[i]
 
-        time = Times[i];
-        kz   = ds_hydro["Kz"][:,i]
+        time = index; #Times[i];
+        kz   = ds_hydro["Kz"][:,index]
 
         cost = zeros(N)
-        if haskey(adj_forcing, i)
-
-            # println("adj has forcing @ time $(i)")
+        if haskey(adj_forcing, index)
+            # println("adj has forcing @ time $(index)")
             # println("Sum of penalty for alg1 = $(sum(penalty1))")
             # println("Sum of penalty for alg2 = $(sum(penalty2))")
             # println("Sum of cost = $(sum(adj_forcing[i]))")
-            cost = adj_forcing[i] 
+            cost = adj_forcing[index] 
         end 
 
         # LAMBDA 1 (LANGRANGIAN MULTIPLIER FOR HABS /ALGAE 1)
@@ -231,14 +252,14 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String, step
         gamma1 = ds_algae["gamma1"][:,i] .- algae1["Li"]
         penalty1 = calculate_penalty(gamma1, use_penalty, PMAX, PMIN)
         lambda1 = advance_lagrangian_multiplier(algae1, L1_n, kz, gamma1, discretization, penalty1, cost_microcystis)
-        save2output(time, i, "lambda1", lambda1)
+        save2output(index, i, "lambda1", lambda1)
         L1_n = lambda1
 
         cost_diatom = cost .* chla2cell_diatom
         gamma2 = ds_algae["gamma2"][:,i] .- algae2["Li"]
         penalty2 = calculate_penalty(gamma2, use_penalty, PMAX, PMIN)
         lambda2 = advance_lagrangian_multiplier(algae2, L2_n, kz, gamma2, discretization, penalty2, cost_diatom)
-        save2output(time, i, "lambda2", lambda2)
+        save2output(index, i, "lambda2", lambda2)
         L2_n = lambda2
 
 
@@ -283,16 +304,16 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String, step
     ds = NCDataset(fout,"c")
     nt = div(M,isave) + 1 
     defDim(ds, "z", length(z)) 
-    defDim(ds, "time", nt)
+    defDim(ds, "t", nt)
 
     v = defVar(ds, "z", Float32, ("z",))
     v[:] = z
 
-    v = defVar(ds, "time", Float32, ("time",), attrib = OrderedDict("units" => "seconds"))
-    v[:] = collect(1:nt)
+    v = defVar(ds, "t", Int, ("t",), attrib = OrderedDict("units" => "seconds"))
+    v[:] = time_index_vec #collect(1:nt)
 
     for var in var2save
-        v = defVar(ds, var, Float64,("z","time"), attrib = OrderedDict(
+        v = defVar(ds, var, Float64,("z","t"), attrib = OrderedDict(
         "units" =>  units_dict[var], "long_name" => var2name[var]))
         v[:,:] = output[var];
     end
@@ -305,7 +326,7 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String, step
     # [1] Adjust growth rates 
     grad = ds_algae["gamma1"][:,:] .* output["lambda1"]
     new_gamma = @. ds_algae["gamma1"][:,:] - grad*eps 
-    v1 = defVar(ds, "gamma1", Float64,("z","time"), attrib = OrderedDict(
+    v1 = defVar(ds, "gamma1", Float64,("z","t"), attrib = OrderedDict(
         "units" =>  "-", "long_name" => "gradient descent parameterized growth1"))
     v1[:,:] = new_gamma;
 
@@ -315,7 +336,7 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String, step
      # [2] Adjust growth rates 
     grad = ds_algae["gamma2"][:,:] .* output["lambda2"]
     new_gamma = @. ds_algae["gamma2"][:,:] - grad*eps 
-    v2 = defVar(ds, "gamma2", Float64,("z","time"), attrib = OrderedDict(
+    v2 = defVar(ds, "gamma2", Float64,("z","t"), attrib = OrderedDict(
         "units" =>  "-", "long_name" => "gradient descent parameterized growth2"))
     v2[:,:] = new_gamma;
 

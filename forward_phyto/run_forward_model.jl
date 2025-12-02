@@ -40,8 +40,7 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
     if M <= 0
         error("M must be greater than 0. Check istart and iend values.")
     end
-    time_index_vec = collect(istart:iend)
-
+    time_index_vec = collect(istart:(iend+1))
 
 
     file_out_name = "$(file_out_name)_$(time_range).nc"
@@ -49,10 +48,10 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
     println("\t Adjusting our growth guess using the gamma from: $(adjoint_ds)")
     println("\t Will be saving phytoplankton output to: $(file_out_name)")
 
-    forcing_folder = "/pscratch/sd/s/siennaw/stockton_field_data/forcing_for_model/2024/august6-16/"
+    forcing_folder = "/pscratch/sd/s/siennaw/stockton_field_data/forcing_for_model/2024/august6-28/"
     # Hydrodynamic dataset 
-    ds = NCDataset("/pscratch/sd/s/siennaw/two_species/adjoint_phytoplankton/run_hydro/HYDRO_$time_range.nc")
-
+    ds = NCDataset("/pscratch/sd/s/siennaw/two_species/adjoint_phytoplankton/run_hydro/HYDRO_AUGUST6-28.nc")
+    
     # If this is the first iteration, we need to calculate gamma based on the light and 
     # provided phytoplankton growth rate
     if adjoint_ds == "FIRST"
@@ -64,8 +63,8 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
         df = CSV.read(cimis_fn, DataFrame)
         par = df[!,"Sol Rad (PAR)"]
         println("Read in CIMIS data ...")
-        function get_light(index::Int, par=par)
-            return par[index]
+        function get_light(index0::Int, par=par)
+            return par[index0]
         end
     else   
         calculate_gamma = false
@@ -94,7 +93,7 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
     hr2s = 1/3600
 
     # (4) Light 
-    background_turbidity =  1
+    background_turbidity =  0.9 # try higher # 1 # Was 0.6
     
     #********************** DEFINE PHYTOPLANKTON FORCINGS ***************************
 
@@ -127,18 +126,22 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
 
     chla2cell_mc =  1e-6/0.36  # ug chl-a/ml --> pg chl-a/ml --> 0.36  pg chl-a/cell Microcystis
     chla2cell_diatom = 1e-6/4 
-    init_algae = 0.004/2 # SW change was 0.01
-    init_conc = 12810 #10810
-    mult = 1.8
-    init_algae = init_conc/(1/chla2cell_mc + mult/chla2cell_diatom)
+    # init_algae = 0.004/2 # SW change was 0.01
+    init_conc = 746 #* 0.72 #9350*1.2 #12810 #10810
+    # mult = 1.5 # was 3 
+    # init_algae = init_conc/(1/chla2cell_mc + mult/chla2cell_diatom)
     # print("Initial algae concentration: $(init_algae) cells \n")
 
-    algae1["c"] = zeros(N) .+ init_algae #/2 #(init_conc*0.01     # init_algae 
-    algae2["c"] = zeros(N) .+ init_algae*mult #/2 # (init_conc* 0.002303 # init_algae*2
+    # Test SW for august 13, using the mapping data
+    algae1["c"] = zeros(N) .+ init_conc*chla2cell_mc
+    # algae1["c"] = zeros(N) .+ (init_conc*0.05)*chla2cell_mc
+    algae2["c"] = zeros(N)# .+ (init_conc*0.95)*chla2cell_diatom
+
+    # algae1["c"] = zeros(N) .+ init_algae #/2 #(init_conc*0.01     # init_algae 
+    # algae2["c"] = zeros(N) .+ init_algae*mult #/2 # (init_conc* 0.002303 # init_algae*2
 
     # Create vector to hold the time steps 
     Times = collect(1:dt:(M*dt))
-    real_times_saved = []
 
     #***************************************************************************
     save2output(1, 1, "algae1", algae1["c"])
@@ -148,22 +151,22 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
 
     # Iterate through time 
     for i in 2:M
-
-        time = Times[i];
+        index = time_index_vec[i]
+        time = index #Times[i];
 
         # Hydrodynamics
-        variables["Kz"] = ds["Kz"][:,i]
+        variables["Kz"] = ds["Kz"][:,index]
 
         # Phytoplankton
         if calculate_gamma 
-            I0 = get_light(i)
+            I0 = get_light(index)
             # light = self_shading(algae1, algae2, I0, background_turbidity, discretization)
             light = light_decay(I0, background_turbidity, discretization)
             growth1 = zeros(N)
             growth2 = zeros(N)
-            for i in 1:N 
-                growth1[i] = algae1["pmax"] * light[i]/(algae1["Hi"] + light[i]) 
-                growth2[i] = algae2["pmax"] * light[i]/(algae2["Hi"] + light[i])
+            for j in 1:N 
+                growth1[j] = algae1["pmax"] * light[j]/(algae1["Hi"] + light[j]) 
+                growth2[j] = algae2["pmax"] * light[j]/(algae2["Hi"] + light[j])
             end
 
         else 
@@ -224,16 +227,16 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
     ds = NCDataset(fout,"c")
     nt = div(M,isave) + 1 
     defDim(ds, "z", length(z)) 
-    defDim(ds, "time", nt)
+    defDim(ds, "t", nt)
 
     v = defVar(ds, "z", Float32, ("z",))
     v[:] = z
 
-    v = defVar(ds, "time", Float32, ("time",), attrib = OrderedDict("units" => "seconds"))
-    v[:] = collect(1:nt)
+    v = defVar(ds, "t", Int, ("t",), attrib = OrderedDict("units" => "seconds"))
+    v[:] = time_index_vec #collect(1:nt)
 
     for var in var2save
-        v = defVar(ds, var, Float64,("z","time"), attrib = OrderedDict(
+        v = defVar(ds, var, Float64,("z","t"), attrib = OrderedDict(
         "units" =>  units_dict[var], "long_name" => var2name[var]))
         v[:,:] = output[var];
     end

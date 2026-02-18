@@ -1,0 +1,232 @@
+
+
+trying out different initial conditions ... 
+init_conc = 12810 
+with 50:50 split = 
+adjoint_1_AUGUST6-16.nc 1.444330096530936e11
+
+trying chl-a sensor @ 55:58
+adjoint_1_AUGUST6-16.nc 8.3802325588818655e9
+* nice behavior, seeing nutrient-limiting like situation. doesn't match obs well.
+
+trying bigger steps...
+still reduced over 10 -- trying even more aggressively big step
+step_sizes = [100, 50 , 10, 1, 1, 0.01,  0.01, 0.01, 0.01, 0.001, 0.001, 0.001] # Different step sizes to try
+too big! 
+
+going back... 
+adjoint_2_AUGUST6-16.nc 6.403546508647413e9
+adjoint_8_AUGUST6-16.nc 6.243447526977643e9
+
+trying out twice as many MC as diatoms 
+adjoint_1_AUGUST6-16.nc 1.418128112377295e10
+adjoint_2_AUGUST6-16.nc 7.891856530647889e9
+hmmm 
+
+trying twice as many diatoms as MC 
+adjoint_1_AUGUST6-16.nc 6.773913917630486e9
+adjoint_12_AUGUST6-16.nc 5.729056524524971e9
+
+-->1.5 times as many diatoms as MC 
+    adjoint_1_AUGUST6-16.nc 7.188836456105244e9
+    adjoint_12_AUGUST6-16.nc 5.849041569571896e9
+
+    increasing step size...got down to 
+    adjoint_11_AUGUST6-16.nc 5.560031992196534e9
+
+    increasing step size again ... 
+    it's looking REALLY GOOD!!! 
+    adjoint_14_AUGUST6-16.nc 4.855265800322226e9
+
+    increasing step size more ...
+    ok went too far ... trying to get back to better step size 
+    step_sizes = [20, 10, 5 , 5, 5, 5, 1, 1, 1, 1, 1, 0.01,  0.01, 0.01, 0.01, 0.01, 0.001, 0.001] # Different step sizes to try
+    step size is *2 for 1: 
+    got cost down to: 
+    adjoint_14_AUGUST6-16.nc 4.781555333341356e9
+
+    step_sizes = [20, 10, 5 , 5, 5, 5, 5,1, 1, 1, 1, 1, 0.01,  0.01, 0.01, 0.01, 0.01, 0.001, 0.001] # Different step sizes to try
+    adjoint_18_AUGUST6-16.nc 4.7546405993335285e9
+
+    step_sizes = [20, 10, 5 , 5, 5, 5, 5,1, 1, 1, 1, 1,1,1, 0.01,  0.01, 0.01,  0.01, 0.01,  0.01, 0.01, 0.01, 0.01, 0.01, 0.01,0.001, 0.001] # Different step sizes to try
+    adjoint_18_AUGUST6-16.nc 4.7436653283846245e9
+
+
+    adjoint_18_AUGUST6-16.nc 4.7436653283846245e9
+
+Let's try 1.7*Diatoms : MC
+    * adjoint_1_AUGUST6-16.nc 6.977439120050763e9
+    * adjoint_27_AUGUST6-16.nc 4.657389548088265e9
+    Pretty good! 
+    Still decreasing at 37 iterations: 
+    adjoint_39_AUGUST6-16.nc 4.656967803130226e9
+
+Let's try 1.9*Diatoms : MC 
+    * adjoint_1_AUGUST6-16.nc 6.830718106113806e9
+    * adjoint_27_AUGUST6-16.nc 4.609267540946779e9
+
+
+JUST learned adjoint needs to be forced at 1 m down so have to re-start this whole process..
+
+
+Let's try 1.8*Diatoms : MC 
+    * adjoint_1_AUGUST6-16.nc 8.362732646679465e9
+    * Bouncing around:
+        * adjoint_26_AUGUST6-16.nc 6.143067501491989e9
+    
+Trying  1.5*Diatoms : MC 
+    * adjoint_1_AUGUST6-16.nc 8.312512302150738e9
+    * adjoint_24_AUGUST6-16.nc 6.166119814655478e9
+
+    
+
+--------
+August 21, 2025
+
+Running 4am - 9pm on August 6th 
+
+1.5* Diatoms 
+    adjoint_38_AUGUST6-16.nc 9.12093637284101e10
+
+1.1 * diatoms 
+    adjoint_1_AUGUST6-16.nc 9.503621351030525e10
+
+1.8 * diatoms 
+    adjoint_14_AUGUST6-16.nc 9.171639287420547e10
+
+Okay commented out the profiler and that's helping significantly
+    mult = 1.5
+    adjoint_9_AUGUST6-16.nc 4.313017839228264e9
+    adjoint_38_AUGUST6-16.nc 3.0597977905013294e9
+    nice! 
+
+Now that i've commented out the penalty function, the cost is decreasing monotonically. Going to keep that commented out for a bit
+Interested in capturing full day's behavior.  
+
+* mult = 1.5
+adjoint_1_AUGUST6-16.nc 4.993708188646639e9
+adjoint_34_AUGUST6-16.nc 3.015243605844312e9
+
+
+* mult = 1.3
+adjoint_32_AUGUST6-16.nc 3.0209540648403788e9
+
+* 1.7 --> down to e8 
+adjoint_34_AUGUST6-16.nc 5.751689006903942e8
+
+1.8 
+adjoint_24_AUGUST6-16.nc 5.744097013173519e8
+
+1:1 gives adjoint_49_AUGUST6-16.nc 5.3273957442373466e8
+upper iteration step sizes ... 
+
+takinga break i feel like we need more diatoms to get that sinking behavior ...
+
+
+
+August 26 2025
+Funny to be modeling august 2024 one year later! Trying to work through each day in august fairly systematically and save results. 
+
+* August 6:
+    adjoint_12_august_06.nc 7.72590641194498e8
+* August 7:
+    adjoint_13_august_07.nc 4.664350595006339e8
+* August 8:
+    adjoint_14_august_08.nc 3.2316334301790905e8
+* August 9:
+    adjoint_56_august_09.nc 2.3881741854100835e8
+* August 10:
+    adjoint_76_august_10.nc 1.6041942594474328e8
+* August 11:
+    adjoint_78_august_11.nc 6.9256964988021e8
+* August 12:
+    adjoint_78_august_12.nc 6.217286146285787e8
+* August 13:
+adjoint_337_august_13.nc 2.0936737474874613e8
+*August 14:
+    adjoint_18_august_14.nc 3.839618571630888e8'
+* August 15:
+    adjoint_6_august_15.nc 1.2909719388005548e10
+    Crazy growth on this day. Very high chl-a! 
+
+* August 16:
+    Very low levels this day. Not much happening. Excellent convegergence 
+    Got down to ~ 1.14e8 
+
+* August 18:
+    adjoint_66_august_18.nc 4.3839553847154754e8
+
+* august 20 
+    poor convegence 
+    adjoint_10_august_20.nc 9.232686321461085e8
+
+* august 22 
+    adjoint_76_august_22.nc 1.0957489153217978e9
+
+* August 23 
+    adjoint_74_august_23.nc 4.1513471702533996e8
+
+*August 24 
+
+August 24:
+    adjoint_84_august_25.nc 3.004376072963796e8
+
+August 26: 
+    adjoint_9_august_26.nc 6.707273866610858e8
+
+adjoint_63_august_27.nc 4.7172527927886313e8
+
+
+
+October 23 2025
+Trying to adjust the diatom : MC ratio based on the mapping data. SEems like way more diatoms than
+MC from a chl-a perspective .. .
+
+
+
+
+
+
+
+
+
+August 14 with the 99% / 1% percent:
+adjoint_50_august_14.nc 2.891670439892723e8
+
+
+Okay,  got the pychocyanin data from Ellen! Trying to see if just setting diatoms =0 will work w/ the adjoint
+
+
+
+(1) August 6 
+adjoint_mc_95_august_6.nc 2.0065993576681283e8
+
+
+
+12/2/2025
+Alright, I'm ready to try and finalize this work by doing another pass. Here's what I'm interested in doing
+    1. Using the pychocyanin data to "guess" the MC:diatoms ratio 
+    2. Using a penalty term to constrain my growth estimates so they don't go crazy (1e2 >> )
+    
+
+[1] 1174792
+(nersc-python) siennaw@nid004180:~/scratch/siennaw/two_species/adjoint_phytoplankton> ./adjoint_model.jl > august11.out & 
+[2] 1175409
+(nersc-python) siennaw@nid004180:~/scratch/siennaw/two_species/adjoint_phytoplankton> ./adjoint_model.jl > august20.out & 
+[3] 1175627
+(nersc-python) siennaw@nid004180:~/scratch/siennaw/two_species/adjoint_phytoplankton> ./adjoint_model.jl > august21.out & 
+[4] 1175780
+(nersc-python) siennaw@nid004180:~/scratch/siennaw/two_species/adjoint_phytoplankton> ./adjoint_model.jl > august22.out & 
+[5] 1175933
+(nersc-python) siennaw@nid004180:~/scratch/siennaw/two_species/adjoint_phytoplankton> ./adjoint_model.jl > august23.out & 
+[6] 1176134
+(nersc-python) siennaw@nid004180:~/scratch/siennaw/two_species/adjoint_phytoplankton> ./adjoint_model.jl > august24.out & 
+[7] 1176310
+(nersc-python) siennaw@nid004180:~/scratch/siennaw/two_species/adjoint_phytoplankton> ./adjoint_model.jl > august25.out & 
+[8] 1176466
+(nersc-python) siennaw@nid004180:~/scratch/siennaw/two_species/adjoint_phytoplankton> ERROR: LoadError: SystemError: opening file "/global/homes/s/siennaw/scratch/siennaw/two_species/adjoint_phytoplankton/params/run_params_august_25.jl": No such file or directory
+
+
+
+
+August 7, 15 >> killed 

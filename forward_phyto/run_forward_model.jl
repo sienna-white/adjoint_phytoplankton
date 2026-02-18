@@ -1,14 +1,13 @@
 #!/usr/bin/env julia
 
-using Plots
 using Printf
 using DataStructures: OrderedDict
 using NCDatasets
 # using Arrow, DataFrames
 using CSV, DataFrames
-using Colors
-using ColorSchemes
-using Plots
+# using Colors
+# using ColorSchemes
+# using Plots
 using Printf
 using LaTeXStrings
 using Profile
@@ -22,6 +21,8 @@ include("/global/homes/s/siennaw/scratch/siennaw/two_species/adjoint_phytoplankt
 include("/global/homes/s/siennaw/scratch/siennaw/two_species/adjoint_phytoplankton/model_code/output.jl")
 include("/global/homes/s/siennaw/scratch/siennaw/two_species/adjoint_phytoplankton/model_code/define_params.jl")
 
+parameter="/global/homes/s/siennaw/scratch/siennaw/two_species/adjoint_phytoplankton/params/run_params_august_25.jl" 
+include(parameter) 
 
 function run_forward_model(file_out_name::String, adjoint_ds::String)
 
@@ -31,11 +32,14 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
     dz = global_params["dz"] # grid spacing - may need to adjust to reduce oscillations
     dt = global_params["dt"] # (seconds) size of time step
     # M  = global_params["M"]  # number of time steps
-    time_range = global_params["time_range"] # number of time steps
 
 
-    istart = global_params["istart"] # start time step
-    iend = global_params["iend"] # end time step
+    # Look at the daily parameters
+    time_range = daily_params["time_range"] # number of time steps
+    istart = daily_params["istart"] # start time step
+    iend = daily_params["iend"] # end time step
+
+
     M = iend - istart + 1 # number of time steps
     if M <= 0
         error("M must be greater than 0. Check istart and iend values.")
@@ -127,15 +131,22 @@ function run_forward_model(file_out_name::String, adjoint_ds::String)
     chla2cell_mc =  1e-6/0.36  # ug chl-a/ml --> pg chl-a/ml --> 0.36  pg chl-a/cell Microcystis
     chla2cell_diatom = 1e-6/4 
     # init_algae = 0.004/2 # SW change was 0.01
-    init_conc = 746 #* 0.72 #9350*1.2 #12810 #10810
+    total = daily_params["total_chla_init"]
+    init_mc = daily_params["microcystis_init"] 
+    init_dm = total - init_mc
+
+    
     # mult = 1.5 # was 3 
     # init_algae = init_conc/(1/chla2cell_mc + mult/chla2cell_diatom)
     # print("Initial algae concentration: $(init_algae) cells \n")
 
     # Test SW for august 13, using the mapping data
-    algae1["c"] = zeros(N) .+ init_conc*chla2cell_mc
+    algae1["c"] = zeros(N) .+ init_mc*chla2cell_mc
     # algae1["c"] = zeros(N) .+ (init_conc*0.05)*chla2cell_mc
-    algae2["c"] = zeros(N)# .+ (init_conc*0.95)*chla2cell_diatom
+    algae2["c"] = zeros(N) .+ init_dm*chla2cell_diatom
+
+    print("Initial algae1 concentration: $(algae1["c"][1]) cells \n")
+    print("Initial algae2 concentration: $(algae2["c"][1]) cells \n")
 
     # algae1["c"] = zeros(N) .+ init_algae #/2 #(init_conc*0.01     # init_algae 
     # algae2["c"] = zeros(N) .+ init_algae*mult #/2 # (init_conc* 0.002303 # init_algae*2

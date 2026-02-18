@@ -5,9 +5,9 @@ using DataStructures: OrderedDict
 using NCDatasets
 using DataFrames
 using CSV, DataFrames
-using Colors
-using ColorSchemes
-using Plots
+# using Colors
+# using ColorSchemes
+# using Plots
 using Printf
 using LaTeXStrings
 using LinearAlgebra
@@ -20,6 +20,8 @@ include("/global/homes/s/siennaw/scratch/siennaw/two_species/adjoint_phytoplankt
 include("/global/homes/s/siennaw/scratch/siennaw/two_species/adjoint_phytoplankton/model_code/forcings.jl") 
 include("/global/homes/s/siennaw/scratch/siennaw/two_species/adjoint_phytoplankton/model_code/output.jl")
 
+parameter="/global/homes/s/siennaw/scratch/siennaw/two_species/adjoint_phytoplankton/params/run_params_august_25.jl" 
+include(parameter) 
 
 using Random
 Random.seed!(1234);      # Seed number 1234
@@ -36,12 +38,13 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String, step
     dz = global_params["dz"] # grid spacing - may need to adjust to reduce oscillations
     dt = global_params["dt"] # (seconds) size of time step
     M  = global_params["M"]  # number of time steps
-    time_range = global_params["time_range"] # number of time steps
 
 
-    # Read in indices from global_params
-    istart = global_params["istart"] # start time step
-    iend = global_params["iend"] # end time step
+    time_range = daily_params["time_range"] # number of time steps
+    istart = daily_params["istart"] # start time step
+    iend = daily_params["iend"] # end time step
+
+
     M = iend - istart + 1 # number of time steps
     time_index_vec = collect(istart:(iend+1))
 
@@ -69,9 +72,9 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String, step
     #     adj_forcing[i] = forcing
     # end
 
-    use_penalty = false 
-    PMAX = 2e-4
-    PMIN = -1e-5
+    use_penalty = true 
+    PMAX = 5/86400 
+    PMIN = 0
 
 
 # chla_filter["chla_smoothed"] = chla_filter["chla_smoothed"] * 1e-3  # ug chl-a/L to ug/ml
@@ -85,7 +88,7 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String, step
 
     function calculate_penalty(gamma, use_penalty, PMAX, PMIN)
         penalty = zeros(N)
-        mu = 0.01 * 50
+        mu = 0.001
         if use_penalty
             for i in 1:N
                 if gamma[i] > PMAX
@@ -102,7 +105,7 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String, step
     adj_forcing_folder= "/pscratch/sd/s/siennaw/stockton_field_data/forcing_for_model/2024/august6-28"
     adj_forcing = Dict() 
 
-    df = CSV.read("$(adj_forcing_folder)/microcystis_for_adjoint.csv", DataFrame)
+    df = CSV.read("$(adj_forcing_folder)/chla_for_adjoint.csv", DataFrame)
     time_steps = df[!, "model_time"]
     chla_vals = df[!, "VALUE"]
     chla_conc_vals = df[!, "chla_smoothed"] #.* 1e-2 #pg_chla_perML"]
@@ -127,15 +130,15 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String, step
 
         chla_mc = ds_algae["algae1"][49:52, model_time] .* cell2chla_mc
         chla_diatom = ds_algae["algae2"][49:52, model_time] .* cell2chla_diatom
-        println("total modeled Microcystis = $(mean(chla_mc))")
-        println("total modeled Diatom = $(mean(chla_diatom))")
-        println("measured chla = $(chla_conc_vals[i])")
+        # println("total modeled Microcystis = $(mean(chla_mc))")
+        # println("total modeled Diatom = $(mean(chla_diatom))")
+        # println("measured chla = $(chla_conc_vals[i])")
         total_modeled_chla = chla_mc .+ chla_diatom
         # println("total_modeled_chla = $(mean(total_modeled_chla))")
         # println("measured chla = $(chla_conc_vals[i])")
         difference_chla = total_modeled_chla .- chla_conc_vals[i]
         # difference_ = (total_modeled_algae .- chla_val) 
-        println("Difference at time step $(time_step_int) is $(difference_chla)")
+        # println("Difference at time step $(time_step_int) is $(difference_chla)")
         difference = zeros(N)
         difference[49:52] .= difference_chla #difference_
         cost += sum(abs.(difference_chla.^2)) 
@@ -182,7 +185,8 @@ function run_backward_model(file_out_name::String, algae_guess_ds:: String, step
 
     # Save model cost 
     println("Total cost of adjoint forcing is $(cost)")
-    open("cost.txt","a") do io
+    println("cost_$(time_range).txt")
+    open("cost_$(time_range).txt","a") do io
         println(io,"$file_out_name $cost")
     end
 

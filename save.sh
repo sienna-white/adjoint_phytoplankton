@@ -1,13 +1,13 @@
-niter=95
+niter=297
 
 
 cd forward_phyto/
-mv forward_mc_${niter}_* ../finished_mc/
-mv forward_mc_1_* ../finished_mc/
+mv forward_${niter}_* ../finished2/
+mv forward_1_* ../finished2/
 
 cd ../backward_lambda/
-mv adjoint_mc_${niter}_* ../finished_mc/
-mv adjoint_mc_1_* ../finished_mc/
+mv adjoint_${niter}_* ../finished2/
+mv adjoint_1_* ../finished2/
 
 # cd forward_phyto/
 # mv forward_${niter}_* ../finished/

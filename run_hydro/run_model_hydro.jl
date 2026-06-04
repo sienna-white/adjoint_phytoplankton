@@ -6,13 +6,13 @@ using DataStructures: OrderedDict
 using NCDatasets
 using Arrow, DataFrames
 using CSV, DataFrames
-using Colors
-using Plots
+# using Colors
+# using Plots
 using Printf
 using LaTeXStrings
 # using Profile
 using Statistics 
-using ColorSchemes
+# using ColorSchemes
 
 include("../model_code/calculate_physical_variables.jl") 
 include("../model_code/advance_variables.jl")
@@ -21,7 +21,7 @@ include("../model_code/forcings.jl")
 include("../model_code/output.jl")
 include("../model_code/define_params.jl")
 
-file_out_name = @sprintf("HYDRO_AUGUST6-28") 
+file_out_name = @sprintf("HYDRO_AUGUST6-28_full") 
 
 function run_my_model(file_out_name::String)
 
@@ -34,7 +34,7 @@ function run_my_model(file_out_name::String)
     dt = global_params["dt"] # (seconds) size of time step
     M  = 190081 #global_params["M"]  # number of time steps
     @info "Running with $M time steps"
-    time_range = global_params["time_range"] # number of time steps
+    # time_range = global_params["time_range"] # number of time steps
 
     file_out_name = @sprintf("%s.nc", file_out_name)
     println("Running model with file_out_name = ", file_out_name)
@@ -83,7 +83,7 @@ function run_my_model(file_out_name::String)
 
     # Increments for saving profiles. set to 1 to save all; 10 saves every 10th, etc. 
     isave = 1 
-    var2save = ["U", "C", "Kz"] #, "L", "Q2","N_BV2"]
+    var2save = ["U", "C", "Kz", "L", "Q2", "N_BV2", "Q2L"]
 
     create_output_dict(M, isave, var2save, N)
 
@@ -163,9 +163,11 @@ function run_my_model(file_out_name::String)
     save2output(1, 1, "U", variables["U"])
     save2output(1, 1, "Kz", variables["Kz"])
     save2output(1, 1, "C", variables["C"])
-    # save2output(1, 1, "L", variables["L"])
-    # save2output(1, 1, "Q2", variables["Q2"])
-    # save2output(1, 1, "N_BV2", variables["N_BV2"])
+    save2output(1, 1, "L", variables["L"])
+    save2output(1, 1, "Q2", variables["Q2"])
+    save2output(1, 1, "Q2L", variables["Q2"])
+
+    save2output(1, 1, "N_BV2", variables["N_BV2"])
     # push!(real_times_saved, real_time[1])
 
     for i in 2:M
@@ -219,9 +221,10 @@ function run_my_model(file_out_name::String)
         save2output(time, i, "U", variables["U"])
         save2output(time, i, "Kz", variables["Kz"])
         save2output(time, i, "C", variables["C"])
-        # save2output(time, i, "L", variables["L"])
-        # save2output(time, i, "Q2", variables["Q2"])
-        # save2output(time, i, "N_BV2", variables["N_BV2"])
+        save2output(time, i, "Q2L", variables["L"])
+        save2output(time, i, "L", variables["L"])
+        save2output(time, i, "Q2", variables["Q2"])
+        save2output(time, i, "N_BV2", variables["N_BV2"])
         # push!(real_times_saved, real_time[i])
 
     end
